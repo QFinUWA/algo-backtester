@@ -133,3 +133,4 @@ dmypy.json
 
 # temp files
 test*
+frontend_plan.ipynb
