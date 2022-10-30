@@ -134,3 +134,6 @@ dmypy.json
 # temp files
 test*
 frontend_plan.ipynb
+
+# private information
+API_key.txt

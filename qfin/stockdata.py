@@ -4,24 +4,28 @@ import pandas as pd
 
 class StockData:
 
-    def __init__(self, frequency='15mins', stocks=['apple', 'google'], period='2022-2023'):
+    def __init__(self, frequency="1T", stocks=['apple', 'google'], period='2022-2023'):
         self._stocks = stocks
         self._indicators = ['price', 'volume']
         self._i = 0
         self._data = {stock: None for stock in stocks}
 
         self._stock_df = dict()
-        # TODO CLEAN THIS
-        self._L = len(pd.read_csv(f'apple.csv', index_col=0))
+        # TODO CLEAN THIS - ensure all data is same length
+        self._L = None
         for stock in stocks:
-            self._stock_df[stock] = pd.read_csv(f'apple.csv', index_col=0)
+            _df = pd.read_csv(
+                f'apple.csv')
+            _df.set_index(pd.DatetimeIndex(_df['date'])).resample(
+                frequency).agg('first')
 
-        self._update_data()
+            if not self._L:
+                self._L = len(_df)
 
+            self._stock_df[stock] = _df
 
     def __len__(self):
         return self._L
-
 
     def __iter__(self):
         self._i = 0
@@ -30,19 +34,19 @@ class StockData:
     def __next__(self):
         self._i += 1
         # print('\t', self._i)
-        if self._i == self._L + 1:
+        if self._i > len(self):
             raise StopIteration
         return {stock: self._data[stock][:self._i] for stock in self._stocks}
 
     @property
     def stocks(self):
-        return stocks
+        return self._stocks
 
-    def _update_data(self):
+    def compress_data(self):
         for stock in self._stocks:
             self._data[stock] = self._stock_df[stock].to_numpy()
 
-    def add_indicator(self, name, func, update=True):
+    def add_indicator(self, name, func):
         self._indicators.append(name)
         if not callable(func):
             raise ValueError(
@@ -54,9 +58,6 @@ class StockData:
                 # print(df.head(10))
                 self._stock_df[stock][name] = func(df)
 
-        if update:
-            self._update_data()
-
     def add_indicators(self, table):
 
         # TODO check that this works
@@ -66,4 +67,3 @@ class StockData:
 
         for name, func in table.items():
             self.add_indicator(name, func, update=False)
-        self._update_data()

@@ -1,7 +1,7 @@
-from qfin import StockData, Algorithm
+from qfin import StockData, Algorithm, Backtester
 
-stock_data = StockData(frequency='15mins', stocks=[
-    'apple', 'google'], period='2022-2023')
+stock_data = StockData(stocks=[
+    'apple'], period='2022-2023')
 
 
 def vol_difference(data):
@@ -16,7 +16,6 @@ class ExampleAlgorithm(Algorithm):
 
     def __init__(self):
         super().__init__()
-        self.test = 'here'
 
     # def on_data(self, data):
     #     # accessing indicators
@@ -32,6 +31,9 @@ class ExampleAlgorithm(Algorithm):
     #     self.buy('google', 'short', self.cash)
 
 
-stragegy = ExampleAlgorithm()
-results = stragegy.backtest(
-    stock_data, sample_period='3 months', overlap=True, samples=20, fee=0.01)
+strategy = ExampleAlgorithm()
+backtester = Backtester(stock_data, sample_period='3 months',
+                        overlap=True, samples=20, fee=0.01)
+
+
+results = backtester.backtest_strategy(strategy)
