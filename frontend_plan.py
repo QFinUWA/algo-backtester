@@ -18,10 +18,7 @@ class ExampleAlgorithm(Algorithm):
         return data['volume'].diff()
 
     def on_data(self, data: dict):
-
-        if self._test:
-            print(self._test)
-            self._test = None
+        pass
 
 
 strategy = ExampleAlgorithm('single')

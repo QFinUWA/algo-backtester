@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 
+import time
+
 
 class StockData:
 
@@ -17,14 +19,19 @@ class StockData:
                 f'apple.csv')
             _df.set_index(pd.DatetimeIndex(_df['date'])).resample(
                 frequency).agg('first')
+            _df = _df.set_index('date')
 
             if not self._L:
                 self._L = len(_df)
 
             self._stock_df[stock] = _df
 
-        self._data = {stock: None for stock in stocks}
+        self._data = None
         self.compress_data()
+
+        # pre calcualte the price at every iteration for efficiency
+        self._prices = [{stock: self._data[i, s*2]
+                         for s, stock in enumerate(stocks)} for i in range(self._L)]
 
     def __len__(self):
         return self._L
@@ -38,15 +45,15 @@ class StockData:
         # print('\t', self._i)
         if self._i > len(self):
             raise StopIteration
-        return {stock: data[:self._i] for stock, data in self._data.items()}
+        return self._prices, self._data[:self._i]
 
     @property
     def indicators(self):
         return self._indicators
 
     def compress_data(self):
-        for stock in self._data:
-            self._data[stock] = self._stock_df[stock].to_numpy()
+        self._data = np.concatenate(
+            [self._stock_df[stock].to_numpy() for stock in self._stock_df], axis=1)
 
     def remove_indicator(self, name):
         if name in self._indicators:

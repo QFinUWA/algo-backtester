@@ -63,9 +63,14 @@ class Backtester:
 
         strategy.cash = cash
         strategy.fee = fee
-        for t in tqdm(iter(self._data)):
-            strategy.on_data(t)
+        strategy.stocks = self._stocks
+        for curr_prices, all_prices in tqdm(iter(self._data)):
+            strategy.run_on_data(curr_prices, all_prices)
         return 'TODO:'
+
+    '''
+    TODO: Add paramter to only recalculate certrain indicators
+    '''
 
     def backtest_straties(self, strategy, parameters, cash=1000, fee=0.005, recalculate_indicators=True):
         # backtesting a range of instances (maybe this should be a separate function?)
