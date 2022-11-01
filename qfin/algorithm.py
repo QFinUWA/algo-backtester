@@ -11,8 +11,27 @@ class Algorithm:
 
     def __init__(self):
         self._stocks = None
-        self._fee = 0
         self._indicator_funcs = dict()
+        self._cash = None
+        self._fee = None
+
+    @property
+    def cash(self):
+        return self._cash
+
+    @cash.setter
+    def cash(self, cash):
+        # TODO: add inputting checks
+        self._cash = cash
+
+    @property
+    def fee(self):
+        return self._fee
+
+    @fee.setter
+    def fee(self, fee):
+        # TODO: add inputting checks
+        self._fee = fee
 
     def add_indicator(self, name, func):
         if not callable(func):
