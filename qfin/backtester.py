@@ -4,6 +4,7 @@ from tqdm import tqdm
 from .stockdata import StockData
 from .algorithm import Algorithm
 import itertools
+from ._portfolio import Portfolio
 
 
 class Backtester:
@@ -61,11 +62,9 @@ class Backtester:
 
         self._calculate_indicators(strategy)
 
-        strategy.cash = cash
-        strategy.fee = fee
-        strategy.stocks = self._stocks
+        portfolio = Portfolio(self._stocks, cash, fee, len(self._data))
         for curr_prices, all_prices in tqdm(iter(self._data)):
-            strategy.run_on_data(curr_prices, all_prices)
+            strategy.run_on_data(curr_prices, all_prices, portfolio)
         return 'TODO:'
 
     '''
@@ -78,7 +77,6 @@ class Backtester:
         keys, values = zip(*parameters.items())
         permutations_dicts = [dict(zip(keys, v))
                               for v in itertools.product(*values)]
-        print(permutations_dicts)
         results = list()
         for paramter_instance in permutations_dicts:
             strategy_instance = strategy(**paramter_instance)

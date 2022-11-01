@@ -45,7 +45,7 @@ class StockData:
         # print('\t', self._i)
         if self._i > len(self):
             raise StopIteration
-        return self._prices, self._data[:self._i]
+        return self._prices[self._i-1], self._data[:self._i]
 
     @property
     def indicators(self):
