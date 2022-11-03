@@ -1,4 +1,4 @@
-from qfin import Algorithm, Backtester
+from qfin.backtester import Algorithm, Backtester
 
 backtester = Backtester(stocks=['apple'], period='2022-2023', sample_period='3 months',
                         overlap=True, samples=20)
@@ -15,10 +15,16 @@ class ExampleAlgorithm(Algorithm):
     def vol_difference(self, data):
         return data['volume'].diff()
 
-    def on_data(self, data: dict, portfolio: Portfolio):
+    def on_data(self, data: dict, portfolio):
         # TODO: Make go faster
-        for _ in range(100):
-            portfolio.enter_position('long', 'apple', quantity=10)
+
+        if 10 < 2:
+            for i in range(100):
+                1 + 2
+
+        for _ in range(5):
+            portfolio.enter_position('long', 'apple', 10, 0)
+        pass
 
 
 strategy = ExampleAlgorithm()

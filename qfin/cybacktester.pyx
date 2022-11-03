@@ -1,20 +1,21 @@
 import pandas as pd
 import numpy as np
-from tqdm import tqdm
-from .stockdata import StockData
-from .algorithm import Algorithm
 import itertools
-from ._portfolio import Portfolio
+from tqdm import tqdm
+from opt.portfolio cimport Portfolio
+from opt.stockdata cimport StockData
+from cyalgorithm cimport CythonAlgorithm
 
 
-class Backtester:
+
+cdef class CythonBacktester:
 
     def __init__(self, stocks=['apple'], period='2022-2023', frequency='1T', sample_period='3 months', overlap=True, samples=20):
 
         self._data = StockData(
             stocks=stocks, period=period, frequency=frequency)
         self._stocks = stocks
-        self._update_indicators = None
+        self._update_indicators = list()
 
     @property
     def fee(self):
@@ -28,10 +29,7 @@ class Backtester:
     Marks indicators as needing to be updated.
     '''
 
-    def update_indicators(self, only: list = None):
-
-        if not self._update_indicators:
-            self._update_indicators = list()
+    def update_indicators(self, only = None):
 
         for indicator in (only or self._data.indicators[2:]):
 
@@ -39,13 +37,11 @@ class Backtester:
                 self._update_indicators.append(indicator)
 
     def _calculate_indicators(self, strategy):
-        if self._update_indicators is None:
-            self.update_indicators()
 
         self._data.add_indicators(
             {k: v for k, v in strategy.indicator_functions.items() if k in self._update_indicators})
 
-        self._update_indicators = None
+        self._update_indicators = list()
 
     '''
     Backtests a strategy with a starting balance and fee. 
@@ -56,16 +52,20 @@ class Backtester:
     def backtest_strategy(self, strategy, cash=1000, fee=0.005):
         # backtesting an instance of a strategy
 
-        if not issubclass(type(strategy), Algorithm):
+        if not issubclass(type(strategy), CythonAlgorithm):
             raise ValueError(
                 f'backtest_strategy() arg 1 must be an Algorithm not {type(strategy)}')
 
         self._calculate_indicators(strategy)
 
         portfolio = Portfolio(self._stocks, cash, fee, len(self._data))
+
+        cdef dict curr_prices
+        cdef np.float64_t[:, :] all_prices
         for curr_prices, all_prices in tqdm(iter(self._data)):
             strategy.run_on_data(curr_prices, all_prices, portfolio)
-        return 'TODO:'
+        # return 'TODO:'
+        return 1
 
     '''
     TODO: Add paramter to only recalculate certrain indicators
@@ -85,4 +85,5 @@ class Backtester:
 
             results.append(self.backtest_strategy(
                 strategy_instance, cash=cash, fee=fee))
-        return results
+        # return results
+        return 1

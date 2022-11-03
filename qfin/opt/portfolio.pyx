@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-class Portfolio:
+cdef class Portfolio:
 
     def __init__(self, stocks: list, cash: float, fee: float, ticks: int):
 
@@ -49,13 +49,13 @@ class Portfolio:
             raise ValueError(
                 f'parameter long must be either \'long\' or \'short\'')
 
-    def enter_position(self, long, stock, quantity=None, value=None):
+    cpdef public enter_position(Portfolio self, str long, str stock, float quantity, float value):
 
-        self._check_long_short(long)
+        # self._check_long_short(long)
 
-        if not (bool(quantity) ^ bool(value)):
-            raise ValueError(
-                f'Please set one quantity or value using quanitity= or value=.')
+        #if not (bool(quantity) ^ bool(value)):
+        #    raise ValueError(
+        #       f'Please set one quantity or value using quanitity= or value=.')
 
         # print(self._curr_prices)
         if quantity:
@@ -63,7 +63,7 @@ class Portfolio:
                 quantity * self._curr_prices[stock] * (1 - self._fee))/self._curr_prices[stock]
 
         else:
-            quantity = price*(1-self._fee)/self._prices[stock]
+            quantity = value*(1-self._fee)/self._prices[stock]
 
         # TODO: check cash isn't negative
         self._cash -= 0
@@ -71,9 +71,8 @@ class Portfolio:
         self._history[self._i, 4*(len(self._stocks)-1) +
                       int(long == 'short')] += 1
 
-        return True
 
-    def exit_position(self, long, stock, quantity=None, value=None):
+    def exit_position(self, str long, str stock, quantity=None, value=None):
 
         self._check_long_short(long)
 
@@ -86,9 +85,9 @@ class Portfolio:
                 quantity * self._curr_prices[stock] * (1 - self._fee))/self._curr_prices[stock]
 
         else:
-            quantity = price*(1-self._fee)/self._prices[stock]
+            quantity = value*(1-self._fee)/self._prices[stock]
 
-        self._cash += price
+        self._cash += value
 
         self._history[self._i, 4 *
                       len(self._stocks) + int(long == 'short') + 2] += 1

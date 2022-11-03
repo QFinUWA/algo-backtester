@@ -1,6 +1,6 @@
 from tqdm import tqdm
-from .stockdata import StockData
-from ._portfolio import Portfolio
+from opt.stockdata cimport StockData
+from opt.portfolio cimport Portfolio
 
 '''
 TODO: This class should definitely contain information about "add_indicator" as 
@@ -8,7 +8,7 @@ they are part of the strategy...
 '''
 
 
-class Algorithm:
+cdef class CythonAlgorithm:
 
     def __init__(self):
         self._stocks = None
@@ -24,7 +24,7 @@ class Algorithm:
                 f'add_indicator expects a function, not {type(func)}')
 
         self._indicator_funcs[name] = func
-    
+
     def run_on_data(self, curr_prices, data, portfolio):
         portfolio.curr_prices = curr_prices
         self.on_data(data, portfolio)
@@ -32,6 +32,3 @@ class Algorithm:
     # to override
     def on_data(self, data: dict, portfolio: Portfolio):
         pass
-
-    
-        

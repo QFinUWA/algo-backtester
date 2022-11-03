@@ -1,10 +1,8 @@
 import numpy as np
 import pandas as pd
 
-import time
 
-
-class StockData:
+cdef class StockData:
 
     def __init__(self, frequency="1T", stocks=['apple', 'google'], period='2022-2023'):
 
@@ -13,7 +11,7 @@ class StockData:
 
         self._stock_df = dict()
         # TODO CLEAN THIS - ensure all data is same length
-        self._L = None
+        self._L = -1
         for stock in stocks:
             _df = pd.read_csv(
                 f'apple.csv')
@@ -21,7 +19,7 @@ class StockData:
                 frequency).agg('first')
             _df = _df.set_index('date')
 
-            if not self._L:
+            if self._L == -1:
                 self._L = len(_df)
 
             self._stock_df[stock] = _df
@@ -30,8 +28,8 @@ class StockData:
         self.compress_data()
 
         # pre calcualte the price at every iteration for efficiency
-        self._prices = [{stock: self._data[i, s*2]
-                         for s, stock in enumerate(stocks)} for i in range(self._L)]
+        self._prices = np.array([{stock: self._data[i, s*2]
+                         for s, stock in enumerate(stocks)} for i in range(self._L)])
 
     def __len__(self):
         return self._L
