@@ -7,5 +7,5 @@ class Backtester(CythonBacktester):
 
 class Algorithm(CythonAlgorithm):
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self):
+        super().__init__()

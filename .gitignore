@@ -137,3 +137,8 @@ frontend_plan.ipynb
 
 # private information
 API_key.txt
+
+# cython builds
+*.c 
+*.cp310*
+clean.py

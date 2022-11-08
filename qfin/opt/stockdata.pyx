@@ -10,11 +10,11 @@ cdef class StockData:
         self._i = 0
 
         self._stock_df = dict()
-        # TODO CLEAN THIS - ensure all data is same length
+        # TODO: CLEAN THIS - ensure all data is same length
         self._L = -1
         for stock in stocks:
             _df = pd.read_csv(
-                f'apple.csv')
+                f'{stock}.csv')
             _df.set_index(pd.DatetimeIndex(_df['date'])).resample(
                 frequency).agg('first')
             _df = _df.set_index('date')

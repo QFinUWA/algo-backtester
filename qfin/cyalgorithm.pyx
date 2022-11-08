@@ -2,11 +2,6 @@ from tqdm import tqdm
 from opt.stockdata cimport StockData
 from opt.portfolio cimport Portfolio
 
-'''
-TODO: This class should definitely contain information about "add_indicator" as 
-they are part of the strategy...
-'''
-
 
 cdef class CythonAlgorithm:
 
@@ -30,5 +25,5 @@ cdef class CythonAlgorithm:
         self.on_data(data, portfolio)
 
     # to override
-    def on_data(self, data: dict, portfolio: Portfolio):
+    def on_data(self, data: dict, portfolio):
         pass

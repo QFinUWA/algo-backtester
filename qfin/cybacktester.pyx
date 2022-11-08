@@ -65,7 +65,7 @@ cdef class CythonBacktester:
         for curr_prices, all_prices in tqdm(iter(self._data)):
             strategy.run_on_data(curr_prices, all_prices, portfolio)
         # return 'TODO:'
-        return 1
+        return portfolio.history
 
     '''
     TODO: Add paramter to only recalculate certrain indicators
