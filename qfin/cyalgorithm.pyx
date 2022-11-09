@@ -6,14 +6,13 @@ import inspect
 cdef class CythonAlgorithm:
 
     def __init__(self):
-        self._stocks = None
-#        self._indicator_funcs = dict()
+        self.indicator_parameters = dict()
 
     @property
     def indicator_functions(self):
         # TODO: filter by only functions
         return {k:v for k, v in inspect.getmembers(type(self)) 
-                if callable(v) and hasattr(getattr(self, k), 'indicator')}
+                if callable(v) and hasattr(getattr(self, k), 'indicator') and not k.startswith('__')}
 
 #    def add_indicator(self, name, func):
 #        if not callable(func):
@@ -28,4 +27,4 @@ cdef class CythonAlgorithm:
 
     # to override
     def on_data(self, data: dict, portfolio):
-        pass
+        return

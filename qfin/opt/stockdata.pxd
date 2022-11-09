@@ -7,3 +7,4 @@ cdef class StockData:
     cdef int _L 
     cdef np.float64_t[:, :] _data 
     cdef dict[:] _prices 
+

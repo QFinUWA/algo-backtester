@@ -4,6 +4,7 @@ import itertools
 from tqdm import tqdm
 from opt.portfolio cimport Portfolio
 from opt.stockdata cimport StockData
+from opt.API import API
 from cyalgorithm cimport CythonAlgorithm
 
 
@@ -29,6 +30,7 @@ cdef class CythonBacktester:
     Marks indicators as needing to be updated.
     '''
 
+
     def update_indicators(self, only = None):
 
         for indicator in (only or self._data.indicators[2:]):
@@ -37,9 +39,7 @@ cdef class CythonBacktester:
                 self._update_indicators.append(indicator)
 
     def _calculate_indicators(self, strategy):
-        self._data.add_indicators(
-            {k: v for k, v in strategy.indicator_functions.items()})
-
+        self._data.add_indicators(strategy.indicator_functions, strategy.indicator_parameters)
         self._update_indicators = list()
 
     '''

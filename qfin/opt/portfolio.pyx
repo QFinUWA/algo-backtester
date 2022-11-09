@@ -94,7 +94,7 @@ cdef class Portfolio:
         #if positions[stock] < real_quantity:
         #    return False
 
-        self._cash += real_quantity*self._prices[stock]  
+        self._cash += real_quantity*self._curr_prices[stock]  
 
         self._add_to_history(stock, 1, 1)
 

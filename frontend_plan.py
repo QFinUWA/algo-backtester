@@ -1,5 +1,4 @@
-import inspect
-from qfin.backtester import Algorithm, Backtester, indicator
+from qfin.backtester import Algorithm, Backtester
 
 
 backtester = Backtester(stocks=['apple'], period='2022-2023', sample_period='3 months',
@@ -8,27 +7,36 @@ backtester = Backtester(stocks=['apple'], period='2022-2023', sample_period='3 m
 
 class ExampleAlgorithm(Algorithm):
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, lb):
 
-    @indicator
-    def vol_difference(data):
+        self.indicator_params = {
+            "vol_difference": {
+                "lookback": lb,
+            }
+        }
+
+    @Algorithm.indicator
+    def vol_difference(data, lookback=100):
         return data['volume'].diff()
 
-    def on_data(self, data: dict, portfolio):
+    def on_data(self, data, portfolio):
 
-        for _ in range(100):
-            portfolio.buy('apple', 1, 0)
+        # for _ in range(100):
+        #     portfolio.buy('apple', 1, 0)
+
+        # for _ in range(20):
+        #     portfolio.sell('apple', 1, 0)
         # if 10 < 2:
         #     for i in range(100):
         #         1 + 2
 
         # for _ in range(5):
         #     portfolio.enter_position('long', 'apple', 10, 0)
-        pass
+
+        return
 
 
-strategy = ExampleAlgorithm()
+strategy = ExampleAlgorithm(50)
 backtester.update_indicators(only=['volume_diff'])
 
 results = backtester.backtest_strategy(strategy, cash=10000, fee=0.005)

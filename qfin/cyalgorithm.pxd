@@ -2,5 +2,4 @@
 
 cdef class CythonAlgorithm:
     
-    cdef list _stocks
-#    cdef dict _indicator_funcs
+    cdef public dict indicator_parameters
