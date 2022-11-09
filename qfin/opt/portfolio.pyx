@@ -46,7 +46,8 @@ cdef class Portfolio:
 
         
     cpdef _add_to_history(Portfolio self, str stock, int sell, float amount):
-        self._history[self._i, self._stock_to_id[stock]*2 + sell] += amount
+        cdef int j = self._stock_to_id[stock]*2 + sell
+        self._history[self._i, j] += amount
 
     def get_longs(self, stock):
 
@@ -70,7 +71,7 @@ cdef class Portfolio:
         cdef float price = quantity* self._fee_mult*self._curr_prices[stock]        
         if self._cash < price:
             return False
-        print('\t', price)
+        # print('\t', price)
         self._cash -= price
 
         self._add_to_history(stock, 0, 1)

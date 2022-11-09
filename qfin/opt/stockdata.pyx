@@ -51,7 +51,7 @@ cdef class StockData:
 
     def compress_data(self):
         self._data = np.concatenate(
-            [self._stock_df[stock].to_numpy() for stock in self._stock_df], axis=1)
+            [self._stock_df[stock].to_numpy() for stock in self._stock_df], axis=1).astype('float64')
 
     def remove_indicator(self, name):
         if name in self._indicators:

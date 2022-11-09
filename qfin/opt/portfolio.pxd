@@ -13,6 +13,7 @@ cdef class Portfolio:
     cdef dict _curr_shorts 
     cdef np.float64_t[:, :] _history
 
+
     cpdef public buy(Portfolio self , str stock, float quantity, float value)
     cpdef public sell(Portfolio self  , str stock, float quantity, float value)
     cpdef public buy_all(Portfolio self, str stock)

@@ -37,9 +37,8 @@ cdef class CythonBacktester:
                 self._update_indicators.append(indicator)
 
     def _calculate_indicators(self, strategy):
-
         self._data.add_indicators(
-            {k: v for k, v in strategy.indicator_functions.items() if k in self._update_indicators})
+            {k: v for k, v in strategy.indicator_functions.items()})
 
         self._update_indicators = list()
 
@@ -64,7 +63,7 @@ cdef class CythonBacktester:
         cdef np.float64_t[:, :] all_prices
         for curr_prices, all_prices in tqdm(iter(self._data)):
             strategy.run_on_data(curr_prices, all_prices, portfolio)
-        # return 'TODO:'
+
         return portfolio.history
 
     '''
