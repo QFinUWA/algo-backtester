@@ -1,3 +1,4 @@
+# this is only for development
 from qfin.backtester import Algorithm, Backtester
 
 
@@ -8,12 +9,12 @@ backtester = Backtester(stocks=['apple'], period='2022-2023', sample_period='3 m
 class ExampleAlgorithm(Algorithm):
 
     def __init__(self, lb):
-
-        self.indicator_params = {
-            "vol_difference": {
-                "lookback": lb,
-            }
-        }
+        pass
+        # self.set_indicator_params({
+        #     "vol_difference": {
+        #         "lookback": lb,
+        #     }
+        # })
 
     @Algorithm.indicator
     def vol_difference(data, lookback=100):

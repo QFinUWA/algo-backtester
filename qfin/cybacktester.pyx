@@ -4,7 +4,7 @@ import itertools
 from tqdm import tqdm
 from opt.portfolio cimport Portfolio
 from opt.stockdata cimport StockData
-from opt.API import API
+# from opt.API import API
 from cyalgorithm cimport CythonAlgorithm
 
 
