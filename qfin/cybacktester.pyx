@@ -8,13 +8,12 @@ from opt.stockdata cimport StockData
 from cyalgorithm cimport CythonAlgorithm
 
 
-
 cdef class CythonBacktester:
 
-    def __init__(self, stocks=['apple'], period='2022-2023', frequency='1T', sample_period='3 months', overlap=True, samples=20):
+    def __init__(self, stocks, data=r'\data', tests=20):
 
-        self._data = StockData(
-            stocks=stocks, period=period, frequency=frequency)
+        self._data = StockData(stocks, data)
+        
         self._stocks = stocks
         self._update_indicators = list()
 
@@ -29,8 +28,6 @@ cdef class CythonBacktester:
     '''
     Marks indicators as needing to be updated.
     '''
-
-
     def update_indicators(self, only = None):
 
         for indicator in (only or self._data.indicators[2:]):

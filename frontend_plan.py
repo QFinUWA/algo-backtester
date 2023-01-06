@@ -1,9 +1,10 @@
-# this is only for development
+# this is for development
 from qfin.backtester import Algorithm, Backtester
 
+data_folder_dir = r"C:\Users\isaac\Downloads\data"
 
-backtester = Backtester(stocks=['apple'], period='2022-2023', sample_period='3 months',
-                        overlap=True, samples=20)
+backtester = Backtester(['AAPL', 'GOOG', 'IBM'],
+                        data=data_folder_dir,  tests=20)
 
 
 class ExampleAlgorithm(Algorithm):

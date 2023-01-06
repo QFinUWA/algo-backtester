@@ -1,32 +1,33 @@
 import numpy as np
 import pandas as pd
-
+import os
 
 cdef class StockData:
 
-    def __init__(self, frequency="1T", stocks=['apple', 'google'], period='2022-2023'):
+    def __init__(self, stocks, data_folder):
 
         self._indicators = ['price', 'volume']
         self._i = 0
 
         self._stock_df = dict()
-        # TODO: CLEAN THIS - ensure all data is same length
-        self._L = -1
-        for stock in stocks:
-            _df = pd.read_csv(
-                f'{stock}.csv')
-            _df.set_index(pd.DatetimeIndex(_df['date'])).resample(
-                frequency).agg('first')
-            _df = _df.set_index('date')
 
-            if self._L == -1:
+        if len(stocks) == 0:
+            raise ValueError(
+                f'Please provide a list of stocks.')
+        
+        self._L = 0
+        for stock in stocks:
+
+            _df = pd.read_csv(os.path.join(data_folder, f'{stock}.csv'))
+            
+            if self._L == 0:
                 self._L = len(_df)
 
             self._stock_df[stock] = _df
 
         self._data = None
         self.compress_data()
-
+        
         # pre calcualte the price at every iteration for efficiency
         cdef int s
         self._prices = np.array([{stock: self._data[i, s*2]
@@ -51,9 +52,9 @@ cdef class StockData:
         return self._indicators
 
     def compress_data(self):
-
         self._data = np.concatenate(
-            [self._stock_df[stock].to_numpy() for stock in self._stock_df], axis=1).astype('float64')
+            [df.loc[:, df.columns != 'time'].to_numpy() for stock, df in self._stock_df.items()], axis=1).astype('float64')
+        
 
     def remove_indicator(self, name):
         if name in self._indicators:

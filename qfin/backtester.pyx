@@ -5,8 +5,8 @@ from functools import wraps
 
 
 class Backtester(CythonBacktester):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, stocks, **kwargs):
+        super().__init__(stocks, **kwargs)
 
 
 class Algorithm(CythonAlgorithm):
