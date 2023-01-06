@@ -138,6 +138,7 @@ dmypy.json
 test*
 frontend_plan.ipynb
 api.py
+delete.ipynb
 
 # private information
 API_key.txt
