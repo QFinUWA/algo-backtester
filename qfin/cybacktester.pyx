@@ -3,19 +3,22 @@ import numpy as np
 import itertools
 from tqdm import tqdm
 from opt.portfolio cimport Portfolio
-from opt.stockdata cimport StockData
-# from opt.API import API
+from opt.stockdata import StockData
 from cyalgorithm cimport CythonAlgorithm
 
 
 cdef class CythonBacktester:
 
-    def __init__(self, stocks, data=r'\data', tests=20):
+    def __init__(self, strategy, stocks, data=r'\data', tests=20, cash=10000, fee=0.005):
 
+        self._strategy = strategy
         self._data = StockData(stocks, data)
-        
         self._stocks = stocks
         self._update_indicators = list()
+        self._cash = cash
+        self._fee = fee
+        self._algorithm_params = dict()
+        self._indicator_params = dict()
 
     @property
     def fee(self):
@@ -35,39 +38,31 @@ cdef class CythonBacktester:
             if indicator not in self._update_indicators:
                 self._update_indicators.append(indicator)
 
-    def _calculate_indicators(self, strategy):
-        self._data.add_indicators(strategy.indicator_functions, strategy.indicator_parameters)
-        self._update_indicators = list()
+#    def _calculate_indicators(self, strategy):
+#        self._data.add_indicators(strategy.indicator_functions, strategy.indicator_parameters)
+#        self._update_indicators = list()
 
-    '''
-    Backtests a strategy with a starting balance and fee. 
+    def set_algorithm_params(self, params):
+        self._algorithm_params.update(params)
 
-    Accepts either an instance of an algorithm.
-    '''
+    def set_indicator_params(self, params):
 
-    def backtest_strategy(self, strategy, cash=1000, fee=0.005):
-        # backtesting an instance of a strategy
+        # TODO unsecure
+        to_update = {k:v for k,v in params.items() if k not in self._indicator_params or self._indicator_params.get(k, None) != v}
 
-        if not issubclass(type(strategy), CythonAlgorithm):
-            raise ValueError(
-                f'backtest_strategy() arg 1 must be an Algorithm not {type(strategy)}')
 
-        self._calculate_indicators(strategy)
+        if len(to_update) == 0:
+            return
 
-        portfolio = Portfolio(self._stocks, cash, fee, len(self._data))
+        self._data.add_indicators(self._strategy, to_update)
+        self._indicator_params.update(params)
 
-        cdef dict curr_prices
-        cdef np.float64_t[:, :] all_prices
-        for curr_prices, all_prices in tqdm(iter(self._data)):
-            strategy.run_on_data(curr_prices, all_prices, portfolio)
-
-        return portfolio.history
 
     '''
     TODO: Add paramter to only recalculate certrain indicators
     '''
 
-    def backtest_straties(self, strategy, parameters, cash=1000, fee=0.005, recalculate_indicators=True):
+    def backtest_straties(self, strategy, parameters, recalculate_indicators=True):
         # backtesting a range of instances (maybe this should be a separate function?)
 
         keys, values = zip(*parameters.items())
@@ -80,6 +75,27 @@ cdef class CythonBacktester:
                 self._calculate_indicators(strategy_instance)
 
             results.append(self.backtest_strategy(
-                strategy_instance, cash=cash, fee=fee))
+                strategy_instance, cash=self._cash, fee=self._fee))
         # return results
         return 1
+
+    '''
+    Backtests the stored strategy. 
+    '''
+
+    def backtest_strategy(self):
+        
+        algorithm = self._strategy(*tuple(), **self._algorithm_params or None)
+
+        # TODO check instaniated
+        
+        # backtesting an instance of a strategy
+
+        portfolio = Portfolio(self._stocks, self._cash, self._fee, len(self._data))
+
+        cdef dict curr_prices
+        cdef dict all_prices
+        for curr_prices, all_prices in tqdm(iter(self._data)):
+            algorithm.run_on_data(curr_prices, all_prices, portfolio)
+
+        return portfolio.history

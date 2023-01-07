@@ -5,8 +5,8 @@ from functools import wraps
 
 
 class Backtester(CythonBacktester):
-    def __init__(self, stocks, **kwargs):
-        super().__init__(stocks, **kwargs)
+    def __init__(self, algorithm, stocks, **kwargs):
+        super().__init__(algorithm, stocks, **kwargs)
 
 
 class Algorithm(CythonAlgorithm):
@@ -18,6 +18,6 @@ class Algorithm(CythonAlgorithm):
     def indicator(cls, func, *args, **kwargs):
         @wraps(func)
         def wrapper_func(*_args, **_kwargs):
-            func(*_args, **_kwargs)
+            return func(*_args, **_kwargs)
         wrapper_func.indicator = True
         return wrapper_func

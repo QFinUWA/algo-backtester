@@ -62,25 +62,27 @@ cdef class StockData:
         for stock in self._stocks:
             del self._stock_df[stock][name]
 
-    def add_indicators(self, table, params):
+    def add_indicators(self, strategy, to_update):
 
-        if not table:
-            return
-
-        # TODO: check that this works
-        # print(table)
-        if not any(type(name) is str and callable(func) for name, func in table.items()):
-            raise ValueError(
-                f'add_indicator expects a dictionary mapping str to func')
+#        if not table:
+#            return
+#
+#        # TODO: check that this works
+#        # print(table)
+#        if not any(type(name) is str and callable(func) for name, func in table.items()):
+#            raise ValueError(
+#                f'add_indicator expects a dictionary mapping str to func')
         
-        for name, func in table.items():
-            
-            self._indicators.append(name)
+        for indicator, params in to_update.items():
+            if indicator not in self._indicators:
+                self._indicators.append(indicator)
 
-            # if function is passed
+            func = strategy.indicator_functions()[indicator]
+
             for stock in self._stock_df:
+                # TODO: add time data back in??
                 df = self._stock_df[stock][['price', 'volume']]
-                kwargs = dict() if not params else params.get([name], dict())
+                kwargs = dict() if not params else params
                 
-                self._stock_df[stock][name] = func(df, **kwargs)
-        self.compress_data()
+                self._stock_df[stock][indicator] = func(df, **kwargs)
+            self.compress_data()
