@@ -139,6 +139,8 @@ test*
 frontend_plan.ipynb
 api.py
 delete.ipynb
+demo.ipynb
+meeting.md 
 
 # private information
 API_key.txt

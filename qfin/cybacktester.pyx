@@ -53,7 +53,6 @@ cdef class CythonBacktester:
 
         if len(to_update) == 0:
             return
-
         self._data.add_indicators(self._strategy, to_update)
         self._indicator_params.update(params)
 

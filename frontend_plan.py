@@ -7,7 +7,7 @@ data_folder_dir = r"C:\Users\isaac\Downloads\data"
 data_fetcher = API(api_key_path='API_key.txt',
                    data_folder=data_folder_dir)
 
-data_fetcher.fetch_data(['GOOG', 'AAPL', 'TSLA', 'IBM'])
+# data_fetcher.fetch_data(['GOOG', 'AAPL', 'TSLA', 'IBM'])
 
 
 class ExampleAlgorithm(Algorithm):
@@ -22,8 +22,6 @@ class ExampleAlgorithm(Algorithm):
         return data['volume'].diff()
 
     def on_data(self, data, portfolio):
-        # print(data)
-        # TODO find better form for data, investigate NaNs
         return
 
 

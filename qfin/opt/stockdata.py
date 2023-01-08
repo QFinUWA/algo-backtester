@@ -48,16 +48,14 @@ class StockData:
         self._i = 0
         self.sinames = [(stock, indicator, i) for i, (stock, indicator) in enumerate(
             product(self.sis, self._indicators))]
-        print(self.sinames)
         return self
 
     def __next__(self):
         self._i += 1
-        # print('\t', self._i)
         if self._i > len(self):
             raise StopIteration
         for stock, indicator, i in self.sinames:
-            self.sis[stock][indicator] = self._data[:, i]
+            self.sis[stock][indicator] = self._data[:self._i, i]
         return self._prices[self._i-1], self.sis
 
     @property
