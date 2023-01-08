@@ -22,6 +22,9 @@ class ExampleAlgorithm(Algorithm):
         return data['volume'].diff()
 
     def on_data(self, data, portfolio):
+        for stock in data:
+            if portfolio.enter_long(stock, 1) == 0:
+                portfolio.sell_long(stock, 1)
         return
 
 
@@ -38,5 +41,6 @@ backtester.set_indicator_params({
     }
 })
 
-results = backtester.backtest_strategy()
-print(results)
+results = backtester.run()
+
+results.to_csv('results.csv')

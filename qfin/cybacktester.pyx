@@ -82,7 +82,7 @@ cdef class CythonBacktester:
     Backtests the stored strategy. 
     '''
 
-    def backtest_strategy(self):
+    def run(self):
         
         algorithm = self._strategy(*tuple(), **self._algorithm_params or None)
 
@@ -97,4 +97,6 @@ cdef class CythonBacktester:
         for curr_prices, all_prices in tqdm(iter(self._data)):
             algorithm.run_on_data(curr_prices, all_prices, portfolio)
 
-        return portfolio.history
+        hist = portfolio.history.set_index(self._data.index)
+
+        return hist

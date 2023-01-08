@@ -62,6 +62,11 @@ class StockData:
     def indicators(self):
         return self._indicators
 
+    @property
+    def index(self):
+        rand_key = [_ for _ in self._stock_df][0]
+        return pd.to_datetime(self._stock_df[rand_key].index)
+
     def compress_data(self):
         self._data = np.concatenate(
             [df.loc[:, df.columns != 'time'].to_numpy() for _, df in self._stock_df.items()], axis=1).astype('float64')

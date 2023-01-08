@@ -1,5 +1,7 @@
 import numpy as np
 import pandas as pd
+from itertools import product
+
 
 cdef class Portfolio:
 
@@ -10,18 +12,21 @@ cdef class Portfolio:
         self._i = -1
         self._cash = cash
         # TODO: arg checking
-        self._fee_mult = 1 - fee
+        self._fee_mult = 1 + fee
+        self._fee_div = 1 - fee
         self._stocks = stocks
         self._stock_to_id = {stock: i for i, stock in enumerate(stocks)}
 
-        self._stock_id = {stock: i for i, stock in enumerate(stocks)}
 
-        self._curr_longs = {stock: 0 for stock in stocks}
-        self._curr_shorts = {stock: 0 for stock in stocks}
-
+        self._short_value = 0
+        self._longs = {stock: 0 for stock in stocks}
+        self._shorts = {stock: [] for stock in stocks} # maybe make a heap or linked list??
         # history is an array of every buy/sell order
         # stock 0's entry is at row indexes (0, 1, 2, 3) for (long_buy, short_buy, long_sell, short_sell)
-        self._history = np.zeros((ticks, len(stocks)*2))
+
+        pos_types = ['long', 'sell', 'short', 'cover']
+        self._history_cols = ['balance'] + [f'{stock}_{longs}' for stock, longs in product(self._stocks, pos_types)]
+        self._history = np.zeros((ticks, 1 + len(stocks)*4))
 
     @property
     def curr_prices(self):
@@ -30,6 +35,7 @@ cdef class Portfolio:
     @curr_prices.setter
     def curr_prices(self, prices):
         self._i += 1
+        self._history[self._i, 0] = self._cash
         self._curr_prices = prices
 
     @property
@@ -42,95 +48,79 @@ cdef class Portfolio:
 
     @property
     def history(self):
-        return pd.DataFrame(np.array(self._history), columns = np.concatenate([[f'{stock}_buys', f'{stock}_sells'] for stock in self._stocks]))
+        df =  pd.DataFrame(np.array(self._history), columns = self._history_cols)
+        df['balance'] = df['balance'].shift(-1)
+        df.iloc[-1,  0] = self._cash
+        return df
 
-        
+    
     cpdef _add_to_history(Portfolio self, str stock, int sell, float amount):
-        cdef int j = self._stock_to_id[stock]*2 + sell
+        cdef int j = 1 + self._stock_to_id[stock]*4 + sell
         self._history[self._i, j] += amount
 
-    def get_longs(self, stock):
 
-        if stock not in self._curr_longs:
-            raise ValueError(f'Stock does not exist.')
+    cpdef enter_long(Portfolio self, str stock, int quantity):
 
-        self._curr_longs[stock]
+        cdef float cost = quantity*self._curr_prices[stock]*self._fee_mult
 
-    def get_shorts(self, stock):
-
-        if stock not in self._curr_shorts:
-            raise ValueError(f'Stock does not exist.')
-
-        self._curr_shorts[stock]
-
-
-    cpdef public buy(Portfolio self, str stock, float quantity, float value):
-
-        # TODO: Value
-
-        cdef float price = quantity* self._fee_mult*self._curr_prices[stock]        
-        if self._cash < price:
-            return False
-        # print('\t', price)
-        self._cash -= price
-
-        self._add_to_history(stock, 0, 1)
-        return True
-
-    cpdef public sell(Portfolio self, str stock, float quantity, float value):
-
-
-        if stock not in self._stocks:
-            raise ValueError(
-                f'{stock} not in list of stocks.'
-            )
-
-        cdef float real_quantity = (quantity * self._curr_prices[stock] * self._fee_mult)/self._curr_prices[stock]
-
-        # TODO: Value
+        if cost > self._cash:
+            return 0
         
-        # check we have quantity to sell
-        # cdef dict positions = self._curr_longs if _long=='long' else self._curr_shorts
-        #if positions[stock] < real_quantity:
-        #    return False
+        self._cash -= cost
 
-        self._cash += real_quantity*self._curr_prices[stock]  
+        self._longs[stock] += quantity
+        self._add_to_history(stock, 0, quantity)  
 
-        self._add_to_history(stock, 1, 1)
+        return 1  
 
-        return True
+    cpdef sell_long(Portfolio self, str stock, int quantity):
 
-    cpdef public buy_all(Portfolio self, str stock):
+        cdef float price = quantity*self._curr_prices[stock]*self._fee_div
+
+        self._cash += price
+
+        self._longs[stock] -= quantity
+        self._add_to_history(stock, 1, quantity)
+
+        return 1  
+
+    cpdef enter_short(Portfolio self, str stock, int quantity):
+
+        cdef float price = quantity*self._curr_prices[stock]*self._fee_mult
+
+        if self._short_value + price > self._cash:
+            return 0
+
+        self._short_value += price
+
+        self._shorts[stock].append((price, quantity))
+
+        self._add_to_history(stock, 2, quantity)
         
-        if stock not in self._stocks:
-            raise ValueError(
-                f'{stock} not in list of stocks.'
-            )
+        return 1  
 
-        cdef float nshorts = min((self._cash * self._fee_mult)/self._curr_prices[stock], self._curr_shorts[stock])
 
-        self._curr_shorts[stock] -= nshorts
+    cpdef cover_short(Portfolio self, str stock, int quantity):
 
-        self._cash -= nshorts * self._curr_prices[stock]
+        cdef float profit = 0
+        cdef float price = self._curr_prices[stock]
+        cdef int i = 0
+        for cost, quant in self._shorts[stock]:
+            if quant > quantity:
+                break
+            quantity  -= quant
+            profit += quant*(cost-price)
+            self._short_value -= cost
+            i += 1
 
-        self._add_to_history(stock, 0, nshorts)
-
-        return False
-
-    cpdef public sell_all(Portfolio self, str stock):
+        if i == 0:
+            return 0
         
-        if stock not in self._stocks:
-            raise ValueError(
-                f'{stock} not in list of stocks.'
-            )
+        self._cash += profit*self._fee_div
 
-        cdef float nlongs = self._curr_longs[stock]
-        self._curr_longs[stock] = 0
-        self._cash += nlongs * self._prices[stock] * self._fee_mult
+        self._shorts[stock] = self._shorts[stock][i:]
 
-        self._add_to_history(stock, 1, nlongs)
+        self._add_to_history(stock, 3, quantity)
 
-        return True
-
-    # TODO: add leverage
+        return 1
     
