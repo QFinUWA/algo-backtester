@@ -6,7 +6,7 @@ from .opt.stockdata import StockData
 
 class Backtester:
 
-    def __init__(self, strategy, stocks, data=r'\data', tests=20, cash=1000, fee=0.005):
+    def __init__(self, strategy, stocks, data=r'\data', tests=20, cash=1000, fee=0.01):
 
         self._strategy = strategy
         self._data = StockData(stocks, data)

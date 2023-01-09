@@ -22,8 +22,8 @@ class ExampleAlgorithm(Algorithm):
         return data['volume'].diff()
 
     def on_data(self, data, portfolio):
-
-        print(portfolio)
+        if self.i > 682500:
+            print(portfolio)
         # return
         for stock in data:
             if portfolio.enter_short(stock, 2) == 0:
@@ -33,12 +33,12 @@ class ExampleAlgorithm(Algorithm):
             # print(f'SHORT {stock}')
         
         self.i += 1
-        if self.i == 25:
-            assert False
+        # if self.i == 25:
+        #     assert False
         return
 
 
-backtester = Backtester(ExampleAlgorithm, ['AAPL', 'GOOG'],
+backtester = Backtester(ExampleAlgorithm, ['AAPL'],
                         data=data_folder_dir,  tests=20)
 
 backtester.set_algorithm_params({
@@ -52,3 +52,5 @@ backtester.set_indicator_params({
 })
 
 results = backtester.run()
+
+results.to_csv('results.csv')

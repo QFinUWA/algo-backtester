@@ -72,7 +72,7 @@ class Portfolio:
 
         cost = quantity*self._curr_prices[stock]*self._fee_mult
 
-        if cost > self._cash:
+        if cost > self._cash - self._short_value:
             return 0
 
         self._cash -= cost
@@ -94,18 +94,21 @@ class Portfolio:
         return 1
 
     def enter_short(self,  stock,  quantity):
+        price = quantity*self._curr_prices[stock]*self._fee_div
 
-        price = quantity*self._curr_prices[stock]*self._fee_mult
+        if price > self._cash:
 
-        if self._short_value + price > self._cash:
             return 0
 
-        self._short_value += price
+        # self._short_value += price
+        self._cash -= price
 
         heapq.heappush(self._shorts[stock], (-price, quantity))
 
         self._add_to_history(stock, 2, quantity)
-
+        # if self._i > 682500:
+        #     print(f'shorted {stock}, {quantity}')
+        #     print(self._short_value, price , self._cash)
         return 1
 
     def cover_short(self,  stock,  quantity):
@@ -113,24 +116,28 @@ class Portfolio:
         profit = 0
         price = self._curr_prices[stock]
         i = 0
+        quantity_o = quantity
         while self._shorts[stock]:
             cost, quant = self._shorts[stock][0]
+
             cost *= -1
 
-            print(cost, quant, quantity)
             if quant > quantity:
                 break
-            heapq.heappop(self._shorts[stock])
+            pconst, pquant = heapq.heappop(self._shorts[stock])
+
             quantity -= quant
-            profit += quant*(cost-price)
-            self._short_value -= cost
+            profit += 2*cost - quant*price
+            # self._short_value -= cost
             i += 1
 
         if i == 0:
             return 0
+        # if self._i > 682500:
+        #     print(f'covered {stock}, {quantity_o} $({profit*self._fee_div})')
 
         self._cash += profit*self._fee_div
 
-        self._add_to_history(stock, 3, quantity)
+        self._add_to_history(stock, 3, quantity_o)
 
         return 1
