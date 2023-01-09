@@ -1,13 +1,10 @@
-import pandas as pd
-import numpy as np
 import itertools
 from tqdm import tqdm
-from opt.portfolio cimport Portfolio
-from opt.stockdata import StockData
-from cyalgorithm cimport CythonAlgorithm
+from .opt.portfolio import Portfolio
+from .opt.stockdata import StockData
 
 
-cdef class CythonBacktester:
+class Backtester:
 
     def __init__(self, strategy, stocks, data=r'\data', tests=20, cash=10000, fee=0.005):
 
@@ -31,7 +28,8 @@ cdef class CythonBacktester:
     '''
     Marks indicators as needing to be updated.
     '''
-    def update_indicators(self, only = None):
+
+    def update_indicators(self, only=None):
 
         for indicator in (only or self._data.indicators[2:]):
 
@@ -48,14 +46,13 @@ cdef class CythonBacktester:
     def set_indicator_params(self, params):
 
         # TODO unsecure
-        to_update = {k:v for k,v in params.items() if k not in self._indicator_params or self._indicator_params.get(k, None) != v}
-
+        to_update = {k: v for k, v in params.items(
+        ) if k not in self._indicator_params or self._indicator_params.get(k, None) != v}
 
         if len(to_update) == 0:
             return
         self._data.add_indicators(self._strategy, to_update)
         self._indicator_params.update(params)
-
 
     '''
     TODO: Add paramter to only recalculate certrain indicators
@@ -83,17 +80,16 @@ cdef class CythonBacktester:
     '''
 
     def run(self):
-        
+
         algorithm = self._strategy(*tuple(), **self._algorithm_params or None)
 
         # TODO check instaniated
-        
+
         # backtesting an instance of a strategy
 
-        portfolio = Portfolio(self._stocks, self._cash, self._fee, len(self._data))
+        portfolio = Portfolio(self._stocks, self._cash,
+                              self._fee, len(self._data))
 
-        cdef dict curr_prices
-        cdef dict all_prices
         for curr_prices, all_prices in tqdm(iter(self._data)):
             algorithm.run_on_data(curr_prices, all_prices, portfolio)
 

@@ -69,7 +69,7 @@ class StockData:
 
     def compress_data(self):
         self._data = np.concatenate(
-            [df.loc[:, df.columns != 'time'].to_numpy() for _, df in self._stock_df.items()], axis=1).astype('float64')
+            [df.loc[:, df.columns != 'time'].to_numpy() for df in self._stock_df.values()], axis=1).astype('float64')
 
     def remove_indicator(self, name):
         if name in self._indicators:

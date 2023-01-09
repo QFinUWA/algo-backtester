@@ -24,10 +24,11 @@ setup(name='qfin',
       description='Framework for backtesting quantitative trading algorithims.',
       packages=find_packages(),
       include_dirs=[numpy.get_include()],
-      ext_modules=cythonize(["qfin/backtester.pyx",
-                             #      "qfin/opt/stockdata.pyx",
-                             "qfin/cyalgorithm.pyx",
-                             "qfin/cybacktester.pyx",
-                             "qfin/opt/portfolio.pyx"]
-                            )
+      # ext_modules=cythonize(["qfin/backtester.pyx",
+      #                        #      "qfin/opt/stockdata.pyx",
+      #                   #      "qfin/cyalgorithm.pyx",
+      #                   #      "qfin/cybacktester.pyx"
+      #                        #      "qfin/opt/portfolio.pyx"
+      #                        ]
+      #                       )
       )

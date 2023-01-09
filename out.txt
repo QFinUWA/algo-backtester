@@ -1,2 +1,0 @@
-<MemoryView of 'ndarray' object>
-<MemoryView of 'ndarray' object>

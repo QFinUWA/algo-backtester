@@ -1,5 +1,6 @@
 # this is for development
-from qfin.backtester import Algorithm, Backtester
+from qfin.algorithm import Algorithm
+from qfin.backtester import Backtester
 from qfin.API import API
 
 data_folder_dir = r"C:\Users\isaac\Downloads\data"
@@ -21,7 +22,18 @@ class ExampleAlgorithm(Algorithm):
 
         return data['volume'].diff()
 
+    @Algorithm.indicator
+    def cumsum(data, lookback=100):
+
+        return data['volume'].cumsum()
+
+    @Algorithm.indicator
+    def vol_difference(data, lookback=100):
+
+        return data['close'] - data['volume']
+
     def on_data(self, data, portfolio):
+        return
         for stock in data:
             if portfolio.enter_long(stock, 1) == 0:
                 portfolio.sell_long(stock, 1)
