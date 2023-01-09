@@ -15,28 +15,26 @@ class ExampleAlgorithm(Algorithm):
 
     def __init__(self, name=None):
         super().__init__()
-        self.name = name
+        self.i = 0
 
     @Algorithm.indicator
     def vol_difference(data, lookback=100):
-
         return data['volume'].diff()
 
-    @Algorithm.indicator
-    def cumsum(data, lookback=100):
-
-        return data['volume'].cumsum()
-
-    @Algorithm.indicator
-    def vol_difference(data, lookback=100):
-
-        return data['close'] - data['volume']
-
     def on_data(self, data, portfolio):
-        return
+
+        print(portfolio)
+        # return
         for stock in data:
-            if portfolio.enter_long(stock, 1) == 0:
-                portfolio.sell_long(stock, 1)
+            if portfolio.enter_short(stock, 2) == 0:
+                portfolio.cover_short(stock, 2)
+                # print(f'COVER {stock}')
+                continue
+            # print(f'SHORT {stock}')
+        
+        self.i += 1
+        if self.i == 25:
+            assert False
         return
 
 
@@ -54,5 +52,3 @@ backtester.set_indicator_params({
 })
 
 results = backtester.run()
-
-results.to_csv('results.csv')

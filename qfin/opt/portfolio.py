@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 from itertools import product
+import heapq
+from prettytable import PrettyTable
 
 
 class Portfolio:
@@ -54,6 +56,14 @@ class Portfolio:
         df.iloc[-1,  0] = self._cash
         return df
 
+    def __str__(self):
+        t = PrettyTable(['Stock', 'Longs', 'Shorts'])
+        for stock in self._stocks:
+            # print([stock, self._longs[stock], sum(q for _, q in self._shorts[stock])])
+            t.add_row([stock, self._longs[stock], sum(q for _, q in self._shorts[stock])])
+            
+        return f'${self._cash}\n' + str(t)
+
     def _add_to_history(self,  stock,  sell,  amount):
         j = 1 + self._stock_to_id[stock]*4 + sell
         self._history[self._i, j] += amount
@@ -92,20 +102,25 @@ class Portfolio:
 
         self._short_value += price
 
-        self._shorts[stock].append((price, quantity))
+        heapq.heappush(self._shorts[stock], (-price, quantity))
 
         self._add_to_history(stock, 2, quantity)
 
         return 1
 
     def cover_short(self,  stock,  quantity):
-
+        
         profit = 0
         price = self._curr_prices[stock]
         i = 0
-        for cost, quant in self._shorts[stock]:
+        while self._shorts[stock]:
+            cost, quant = self._shorts[stock][0]
+            cost *= -1
+
+            print(cost, quant, quantity)
             if quant > quantity:
                 break
+            heapq.heappop(self._shorts[stock])
             quantity -= quant
             profit += quant*(cost-price)
             self._short_value -= cost
@@ -115,8 +130,6 @@ class Portfolio:
             return 0
 
         self._cash += profit*self._fee_div
-
-        self._shorts[stock] = self._shorts[stock][i:]
 
         self._add_to_history(stock, 3, quantity)
 

@@ -1,9 +1,5 @@
-from setuptools import setup, Extension, find_packages
-from Cython.Build import cythonize
-import numpy
-from Cython.Compiler import Options
+from setuptools import setup, find_packages
 
-Options.always_allow_keywords = True
 # import os
 
 # ext_modules = [Extension("backtester", ["qfin/backtester.pyx"]),
@@ -23,7 +19,7 @@ setup(name='qfin',
       version='0.0',
       description='Framework for backtesting quantitative trading algorithims.',
       packages=find_packages(),
-      include_dirs=[numpy.get_include()],
+      # include_dirs=[numpy.get_include()],
       # ext_modules=cythonize(["qfin/backtester.pyx",
       #                        #      "qfin/opt/stockdata.pyx",
       #                   #      "qfin/cyalgorithm.pyx",
