@@ -19,7 +19,7 @@ class Portfolio:
         self._stocks = stocks
         self._stock_to_id = {stock: i for i, stock in enumerate(stocks)}
 
-        self._short_value = 0
+        # self._short_value = 0
         self._longs = {stock: 0 for stock in stocks}
         # maybe make a heap or linked list??
         self._shorts = {stock: [] for stock in stocks}
@@ -68,11 +68,20 @@ class Portfolio:
         j = 1 + self._stock_to_id[stock]*4 + sell
         self._history[self._i, j] += amount
 
-    def enter_long(self,  stock,  quantity):
+    def enter_long(self,  stock,  quantity=None, cost=None):
 
-        cost = quantity*self._curr_prices[stock]*self._fee_mult
+        if not bool(quantity) ^ bool(cost):
+            raise TypeError('Please input quanity OR cost.')
 
-        if cost > self._cash - self._short_value:
+        ##
+        if bool(cost):
+            quantity = cost*self._fee_div/self._curr_prices[stock]
+        
+        ##
+        elif bool(quantity):
+            cost = quantity*self._curr_prices[stock]*self._fee_mult
+
+        if cost > self._cash:
             return 0
 
         self._cash -= cost
@@ -82,9 +91,19 @@ class Portfolio:
 
         return 1
 
-    def sell_long(self,  stock,  quantity):
+    def sell_long(self,  stock,  quantity=None, cost=None):
 
-        price = quantity*self._curr_prices[stock]*self._fee_div
+        if not bool(quantity) ^ bool(cost):
+            raise TypeError('Please input quanity OR cost.')
+
+        ##
+        if bool(cost):
+            quantity = cost*self._fee_div/self._curr_prices[stock]
+
+        ##
+        elif bool(quantity):
+            price = quantity*self._curr_prices[stock]*self._fee_div
+            
 
         self._cash += price
 
@@ -93,9 +112,19 @@ class Portfolio:
 
         return 1
 
-    def enter_short(self,  stock,  quantity):
-        price = quantity*self._curr_prices[stock]*self._fee_div
+    def enter_short(self,  stock,  quantity=None, cost=None):
 
+        if not bool(quantity) ^ bool(cost):
+            raise TypeError('Please input quanity OR cost.')
+
+        ##
+        if bool(cost):
+            quantity = cost*self._fee_div/self._curr_prices[stock]
+
+        ##
+        elif bool(quantity):
+            price = quantity*self._curr_prices[stock]*self._fee_mult
+    
         if price > self._cash:
 
             return 0
@@ -112,32 +141,47 @@ class Portfolio:
         return 1
 
     def cover_short(self,  stock,  quantity):
-        
+
+        quantity = cost*self._fee_div/self._curr_prices[stock]          
         profit = 0
+        deposit = 0
         price = self._curr_prices[stock]
-        i = 0
-        quantity_o = quantity
+
+        rem_quantity = quantity
         while self._shorts[stock]:
             cost, quant = self._shorts[stock][0]
 
             cost *= -1
-
-            if quant > quantity:
+            # no more shorts to sell
+            if rem_quantity == 0:
                 break
-            pconst, pquant = heapq.heappop(self._shorts[stock])
 
-            quantity -= quant
-            profit += 2*cost - quant*price
+            # cannot sell whole position - sell franction
+            if quant > rem_quantity:
+                # TODO: if float else int
+                frac = rem_quantity/quant
+                
+                self._shorts[stock][0] = -cost*frac, quant*frac
+                rem_quantity = 0
+                frac_cost = frac*cost
+                deposit += frac_cost
+                profit += frac_cost - frac*quantity
+
+                break
+            heapq.heappop(self._shorts[stock])
+
+            rem_quantity -= quant
+            deposit += cost
+            profit += cost - quant*price
             # self._short_value -= cost
-            i += 1
 
-        if i == 0:
+        if rem_quantity == quantity:
             return 0
         # if self._i > 682500:
         #     print(f'covered {stock}, {quantity_o} $({profit*self._fee_div})')
 
-        self._cash += profit*self._fee_div
+        self._cash += deposit + profit*self._fee_div
 
-        self._add_to_history(stock, 3, quantity_o)
+        self._add_to_history(stock, 3, quantity)
 
         return 1

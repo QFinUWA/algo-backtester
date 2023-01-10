@@ -6,7 +6,7 @@ from .opt.stockdata import StockData
 
 class Backtester:
 
-    def __init__(self, strategy, stocks, data=r'\data', tests=20, cash=1000, fee=0.01):
+    def __init__(self, strategy, stocks, data=r'\data', tests=20, cash=1000, fee=0.001):
 
         self._strategy = strategy
         self._data = StockData(stocks, data)
@@ -92,7 +92,7 @@ class Backtester:
 
         for curr_prices, all_prices in tqdm(iter(self._data)):
             algorithm.run_on_data(curr_prices, all_prices, portfolio)
-
+        print(portfolio)
         hist = portfolio.history.set_index(self._data.index)
 
         return hist
