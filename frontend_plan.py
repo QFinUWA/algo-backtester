@@ -27,8 +27,8 @@ class ExampleAlgorithm(Algorithm):
             self.dir = self.dir[::-1]
         # return
         for stock in data:
-            if portfolio.enter_long(stock, 2) == 0:
-                # portfolio.cover_short(stock, 2)
+            if portfolio.enter_short(stock, 2) == 0:
+                portfolio.cover_short(stock, 2)
                 # print(f'COVER {stock}')
                 continue
 

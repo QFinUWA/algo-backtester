@@ -140,48 +140,55 @@ class Portfolio:
         #     print(self._short_value, price , self._cash)
         return 1
 
-    def cover_short(self,  stock,  quantity):
+    def cover_short(self, stock, quantity=None, cost=None):
 
-        quantity = cost*self._fee_div/self._curr_prices[stock]          
-        profit = 0
+        bool_quantity, bool_cost = bool(quantity), bool(cost)
+
+        if not bool_quantity ^ bool_cost:
+            raise TypeError('Please input quanity OR cost.')
+  
+        cost_to_buy = 0
         deposit = 0
-        price = self._curr_prices[stock]
-
-        rem_quantity = quantity
+        # price = self._curr_prices[stock]
+        
+        abs_rem = abs_rem_original = quantity if bool_quantity else cost
         while self._shorts[stock]:
-            cost, quant = self._shorts[stock][0]
-
-            cost *= -1
             # no more shorts to sell
-            if rem_quantity == 0:
+            if abs_rem == 0:
                 break
+
+            cos, quant = self._shorts[stock][0]
+
+            cos *= -1
+
+            # quantity we are decreasing to 0 - if quantity is specified 
+            # we want to keep closing positions until rem_quanity is 0,
+            # same for cost - this is a more consice and neater way to 
+            # do this but could also use an if else pattern with repitition 
+            abs_amount = quant if bool_quantity else cos
 
             # cannot sell whole position - sell franction
-            if quant > rem_quantity:
-                # TODO: if float else int
-                frac = rem_quantity/quant
+            if abs_amount > abs_rem:
+                frac = abs_rem/abs_amount
                 
-                self._shorts[stock][0] = -cost*frac, quant*frac
-                rem_quantity = 0
-                frac_cost = frac*cost
-                deposit += frac_cost
-                profit += frac_cost - frac*quantity
+                self._shorts[stock][0] = cos*(frac-1), quant*(1-frac)
+                print( cos*(frac-1), quant*(1-frac))
+
+                deposit += frac*cos
+                cost_to_buy += frac*quant*self._curr_prices[stock]
 
                 break
+
             heapq.heappop(self._shorts[stock])
 
-            rem_quantity -= quant
-            deposit += cost
-            profit += cost - quant*price
-            # self._short_value -= cost
+            abs_rem -= abs_amount
+            deposit += cos
+            cost_to_buy += quant*self._curr_prices[stock]
 
-        if rem_quantity == quantity:
+        if abs_rem == abs_rem_original:
             return 0
-        # if self._i > 682500:
-        #     print(f'covered {stock}, {quantity_o} $({profit*self._fee_div})')
 
-        self._cash += deposit + profit*self._fee_div
+        self._cash += 2*deposit - self._fee_mult*cost_to_buy 
 
         self._add_to_history(stock, 3, quantity)
-
         return 1
