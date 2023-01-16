@@ -13,14 +13,18 @@ data_fetcher = API(api_key_path='API_key.txt',
 
 class ExampleAlgorithm(Algorithm):
 
-    def __init__(self, name=None):
+    def __init__(self, name=None, bruh=None):
         super().__init__()
         self.i = 0
         self.dir = ['BUY', 'SELL']
 
     @Algorithm.indicator
-    def vol_difference(data, lookback=100):
-        return data['volume'].diff()
+    def vol_difference(data, lookback=100, gum = None):
+        return data['volume'].diff() + lookback
+
+    @Algorithm.indicator
+    def cumsum(data, cummie=None):
+        return data['volume'].cumsum()
 
     def on_data(self, data, portfolio):
         if self.i > 100000:
@@ -54,6 +58,13 @@ backtester.set_indicator_params({
     }
 })
 
-results = backtester.run()
+import time
 
-results.to_csv('results.csv')
+s = time.time()
+results = backtester.backtest_strategies({"name": ['Test'], "bruh": [1,2 ]}, {"vol_difference": {"lookback": [0,1], "gum": ['a', 'b', 'c']}, "cumsum": {"cummie": [-1, -2]}})
+print(time.time()-s)
+# results = backtester.run()
+
+print(results)
+
+

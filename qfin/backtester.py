@@ -51,6 +51,7 @@ class Backtester:
 
         if len(to_update) == 0:
             return
+
         self._data.add_indicators(self._strategy, to_update)
         self._indicator_params.update(params)
 
@@ -58,28 +59,65 @@ class Backtester:
     TODO: Add paramter to only recalculate certrain indicators
     '''
 
-    def backtest_straties(self, strategy, parameters, recalculate_indicators=True):
+    def backtest_strategies(self, strategy_params, indicator_params):
+        
         # backtesting a range of instances (maybe this should be a separate function?)
+        results = []
+        # TODO: if not iterable, set exact to list of length 1
+        # TODO: multiprocessing
 
-        keys, values = zip(*parameters.items())
-        permutations_dicts = [dict(zip(keys, v))
-                              for v in itertools.product(*values)]
-        results = list()
-        for paramter_instance in permutations_dicts:
-            strategy_instance = strategy(**paramter_instance)
-            if recalculate_indicators:
-                self._calculate_indicators(strategy_instance)
+        # get all combinations of algorithm paramters
+        param, val = zip(*strategy_params.items())
+        strategy_comb = [dict(zip(param, v)) for v in itertools.product(*val)]
 
-            results.append(self.backtest_strategy(
-                strategy_instance, cash=self._cash, fee=self._fee))
-        # return results
-        return 1
+        # precompute all indicators and store in dictionary
+        indicator_maps = {indicator: dict() for indicator in indicator_params}
+        total_indicator_comb = 1
+        for indicator, paramters in indicator_params.items():
+            
+            param, val = zip(*paramters.items())
 
+            permutations_dicts = [dict(zip(param, v))
+                              for v in itertools.product(*val)]
+
+            total_indicator_comb *= len(permutations_dicts)
+
+            for perm in permutations_dicts:
+                indicator_maps[indicator][tuple(perm.values())] = self._data.calc_indicator(self._strategy, indicator, perm)
+        
+        # get every combination of different indicators
+        with tqdm(total=total_indicator_comb*len(strategy_comb)) as it:
+            for perm in itertools.product(*indicator_maps.values()):
+                
+                new_indicators = {i: indicator_maps[i][c]for i, c in zip(indicator_params.keys(), perm)}
+
+                self._data.add_indicators_explicit(new_indicators)
+
+                # for every combination of algorithm parameters
+                for strat in strategy_comb:
+                    # TODO add params to results
+                    results.append(self.run(algorithm_params=strat, progressbar=False))
+                    it.update(1)
+
+        
+        return results
+       
     '''
     Backtests the stored strategy. 
     '''
 
-    def run(self):
+    def run(self, algorithm_params = None, indicator_params = None, progressbar=True):
+
+        if bool(algorithm_params):
+            if not isinstance(algorithm_params, dict):
+                raise TypeError(f'algorithm_params must be of type dict, not {type(algorithm_params)}')
+            self.set_algorithm_params(algorithm_params)
+
+        
+        if bool(indicator_params):
+            if not isinstance(algorithm_params, dict):
+                raise TypeError(f'indicator_params must be of type dict, not {type(indicator_params)}')
+            self.set_indicator_params(indicator_params)
 
         algorithm = self._strategy(*tuple(), **self._algorithm_params or None)
 
@@ -90,9 +128,10 @@ class Backtester:
         portfolio = Portfolio(self._stocks, self._cash,
                               self._fee, len(self._data))
 
-        for curr_prices, all_prices in tqdm(iter(self._data)):
+        it = tqdm(iter(self._data)) if progressbar else iter(self._data)
+        for curr_prices, all_prices in it:
             algorithm.run_on_data(curr_prices, all_prices, portfolio)
-        print(portfolio)
+        # print(portfolio)
         hist = portfolio.history.set_index(self._data.index)
 
         return hist

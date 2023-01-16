@@ -92,8 +92,20 @@ class StockData:
                 kwargs = dict() if not params else params
 
                 # self._stock_indicators[stock][indicator] = func(df, kwargs)
-                self._stock_df[stock][indicator] = func(df, kwargs)
+                self._stock_df[stock][indicator] = func(df, **kwargs)
 
                 # print('add indicator', func(df, **kwargs),
                 #       self._stock_indicators[stock][indicator])
             self.compress_data()
+
+    def calc_indicator(self, strategy, indicator, kwargs):
+        # TODO: security
+        func = strategy.indicator_functions()[indicator]
+        return {stock: func(self._stock_df[stock], **kwargs).to_numpy() for stock in self._stock_df}
+        
+    def add_indicators_explicit(self, indicators):
+        # TODO: security
+        for indicator, stock_values in indicators.items():
+            for stock, values in stock_values.items():
+                self._stock_df[stock][indicator] = values
+        self.compress_data()
