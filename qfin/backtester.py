@@ -2,7 +2,7 @@ import itertools
 from tqdm import tqdm
 from .opt.portfolio import Portfolio
 from .opt.stockdata import StockData
-
+import pandas as pd
 
 class Backtester:
 
@@ -16,6 +16,7 @@ class Backtester:
         self._fee = fee
         self._algorithm_params = dict()
         self._indicator_params = dict()
+        self._analyser = Analyser()
 
     @property
     def fee(self):
@@ -88,19 +89,20 @@ class Backtester:
         # get every combination of different indicators
         with tqdm(total=total_indicator_comb*len(strategy_comb)) as it:
             for perm in itertools.product(*indicator_maps.values()):
-                
-                new_indicators = {i: indicator_maps[i][c]for i, c in zip(indicator_params.keys(), perm)}
+
+                self._indicator_params.update({ind: dict(zip(indicator_params[ind].keys(), x)) for ind, x in zip(indicator_params.keys(), perm)})
+
+                new_indicators = {i: indicator_maps[i][c] for i, c in zip(indicator_params.keys(), perm)}
 
                 self._data.add_indicators_explicit(new_indicators)
 
                 # for every combination of algorithm parameters
                 for strat in strategy_comb:
                     # TODO add params to results
-                    results.append(self.run(algorithm_params=strat, progressbar=False))
+                    self.run(algorithm_params=strat, progressbar=False)
                     it.update(1)
 
-        
-        return results
+
        
     '''
     Backtests the stored strategy. 
@@ -132,6 +134,45 @@ class Backtester:
         for curr_prices, all_prices in it:
             algorithm.run_on_data(curr_prices, all_prices, portfolio)
         # print(portfolio)
-        hist = portfolio.history.set_index(self._data.index)
 
-        return hist
+        ret = Result()
+        # ret.hist = portfolio.history.set_index(self._data.index)
+        ret.fee = self._fee
+        ret.indicator_params = self._indicator_params.copy()
+        ret.algorithm_params = self._algorithm_params.copy()
+
+        self._analyser.parse_result(ret)
+        
+class Analyser:
+
+    def __init__(self):
+        self._i = 0
+        return
+
+    def parse_result(self, result):
+
+
+        # store in hdf5 file format
+        with pd.HDFStore(f'del/{self._i:02}.hdf5') as store:
+            store.put('results', pd.DataFrame())
+            store.get_storer('results').attrs.metadata = {"fee": result.fee, 
+                                                        "indicator_params": result.indicator_params, 
+                                                        "algorithm_params": result.algorithm_params
+                                                        }
+            self._i += 1
+
+class Result:
+
+    def __init__(self):
+        self.indicator_params = None
+        self.algorithm_params = None
+        self.hist = None
+        self.fee = None
+
+    def __str__(self):
+        return f'{self.indicator_params}\n{self.algorithm_params}\n{self.fee}'
+
+
+
+
+

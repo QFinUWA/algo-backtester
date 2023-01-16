@@ -133,6 +133,7 @@ dmypy.json
 
 # data
 *.csv
+*.hdf5
 
 # temp files
 test*
@@ -143,6 +144,8 @@ demo.ipynb
 meeting.md 
 res.ipynb
 *\unit.py
+del/
+
 # private information
 API_key.txt
 

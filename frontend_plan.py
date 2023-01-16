@@ -33,15 +33,7 @@ class ExampleAlgorithm(Algorithm):
         for stock in data:
             if portfolio.enter_short(stock, 2) == 0:
                 portfolio.cover_short(stock, 2)
-                # print(f'COVER {stock}')
-                continue
-
-            # trade = portfolio.en
-            # print(f'SHORT {stock}')
-        
-        # self.i += 1
-        # if self.i == 25:
-        #     assert False
+   
         return
 
 
@@ -61,10 +53,11 @@ backtester.set_indicator_params({
 import time
 
 s = time.time()
-results = backtester.backtest_strategies({"name": ['Test'], "bruh": [1,2 ]}, {"vol_difference": {"lookback": [0,1], "gum": ['a', 'b', 'c']}, "cumsum": {"cummie": [-1, -2]}})
+results = backtester.backtest_strategies({"name": ['Test'], "bruh": [1,2 ]}, {"vol_difference": {"lookback": [0, 1], "gum": ['a', 'c']}, "cumsum": {"cummie": [-2]}})
 print(time.time()-s)
 # results = backtester.run()
 
-print(results)
+for r in results:
+    print(str(r))
 
 
