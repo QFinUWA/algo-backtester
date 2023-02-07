@@ -38,7 +38,7 @@ class ExampleAlgorithm(Algorithm):
 
 
 backtester = Backtester(ExampleAlgorithm, ['AAPL'],
-                        data=data_folder_dir,  tests=20)
+                        data=data_folder_dir,  tests=20, fee=0.01)
 
 backtester.set_algorithm_params({
     "name": "Test",
@@ -46,18 +46,16 @@ backtester.set_algorithm_params({
 
 backtester.set_indicator_params({
     "vol_difference": {
-        "lookback": 1,
+        "lookback": 50,
     }
 })
 
 import time
 
 s = time.time()
+# results = backtester.run()
 results = backtester.backtest_strategies({"name": ['Test'], "bruh": [1,2 ]}, {"vol_difference": {"lookback": [0, 1], "gum": ['a', 'c']}, "cumsum": {"cummie": [-2]}})
 print(time.time()-s)
 # results = backtester.run()
-
-for r in results:
-    print(str(r))
 
 

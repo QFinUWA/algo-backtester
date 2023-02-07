@@ -26,7 +26,7 @@ class Algorithm:
         # TODO raise error if not dict
         self.indicator_parameters.update(params)
 
-
+    
 #    def add_indicator(self, name, func):
 #        if not callable(func):
 #            raise ValueError(
@@ -40,5 +40,5 @@ class Algorithm:
         self.on_data(data, portfolio)
 
     # to override
-    def on_data(self, data: dict, portfolio: Portfolio):
+    def on_data(self, data: dict, portfolio: Portfolio) -> None:
         return

@@ -18,21 +18,22 @@ class StockData:
                 f'Please provide a list of stocks.')
 
         self._L = 0
+        self._index = None
         for stock in stocks:
 
             _df = pd.read_csv(os.path.join(data_folder, f'{stock}.csv'))
-            _df = _df[self._indicators]
-
+            
             if self._L == 0:
                 self._L = len(_df)
+                self._index = _df['time']
 
-            self._stock_df[stock] = _df
+            self._stock_df[stock] = _df[self._indicators]
 
         self._data = None
         self.compress_data()
 
         # pre calcualte the price at every iteration for efficiency
-        self._prices = np.array([{stock: self._data[i, s*5]
+        self._prices = np.array([{stock: self._data[i, 1 + s*5]
                                   for s, stock in enumerate(stocks)} for i in range(self._L)])
 
         # self._stock_indicators = {stock: {indicator: self._data[:, s*5 + i] for i, indicator in enumerate(
@@ -56,6 +57,7 @@ class StockData:
             raise StopIteration
         for stock, indicator, i in self.sinames:
             self.sis[stock][indicator] = self._data[:self._i, i]
+        
         return self._prices[self._i-1], self.sis
 
     @property
@@ -64,8 +66,7 @@ class StockData:
 
     @property
     def index(self):
-        rand_key = [_ for _ in self._stock_df][0]
-        return pd.to_datetime(self._stock_df[rand_key].index)
+        return self._index
 
     def compress_data(self):
         self._data = np.concatenate(
@@ -74,9 +75,13 @@ class StockData:
     def remove_indicator(self, name):
         if name in self._indicators:
             self._indicators.remove(name)
-        for stock in self._stocks:
+        for stock in self._prices:
             del self._stock_df[stock][name]
-
+    
+    def remove_indicators(self):
+        for name in self._indicators:
+            self.remove_indicator(name)
+    
     def add_indicators(self, strategy, to_update):
 
         for indicator, params in to_update.items():
@@ -109,3 +114,5 @@ class StockData:
             for stock, values in stock_values.items():
                 self._stock_df[stock][indicator] = values
         self.compress_data()
+
+

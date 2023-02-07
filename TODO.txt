@@ -1,0 +1,5 @@
+summary statistics
+make graph (brokeh)
+add input parameter checking
+commenting
+muliprocessing for backtests - can't be in ipynb
