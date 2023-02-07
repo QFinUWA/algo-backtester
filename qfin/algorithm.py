@@ -36,9 +36,9 @@ class Algorithm:
 #        self._indicator_funcs[name] = func
 
 
-    def run_on_data(self, curr_prices, prices, indicators, portfolio):
-        portfolio.curr_prices = curr_prices
-        self.on_data((prices, indicators), portfolio)
+    def run_on_data(self, args, portfolio):
+        portfolio.curr_prices, *data = args
+        self.on_data(data, portfolio)
 
     # to override
     def on_data(self, prices: dict, indicators: dict, portfolio: Portfolio) -> None:

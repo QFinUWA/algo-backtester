@@ -7,7 +7,7 @@ from multiprocessing import Pool
 from functools import partial
 import math
 from time import time
-
+import collections
 from .opt.indicator import Indicators
 
 class Backtester:
@@ -54,10 +54,6 @@ class Backtester:
             if indicator not in self._update_indicators:
                 self._update_indicators.append(indicator)
 
-#    def _calculate_indicators(self, strategy):
-#        self._data.add_indicators(strategy.indicator_functions, strategy.indicator_parameters)
-#        self._update_indicators = list()
-
     def set_algorithm_params(self, params):
         self._algorithm_params.update(params)
 
@@ -98,35 +94,20 @@ class Backtester:
     def params_to_hashable(self, params):
         return tuple(sorted([(p, v) for p, v in params.items()]))
 
-    def run_wrapper(self, alg_params):
-        self.run(algorithm_params=alg_params, progressbar=False)
+    def run_wrapper(self, args):
+        alg_params, ind_params = args
+        return self.run(algorithm_params = alg_params, indicator_params = ind_params, progressbar=False)
 
-    '''
-    TODO: Add paramter to only recalculate certrain indicators
-    '''
 
-    def backtest_strategies(self, strategy_params, indicator_params, multiprocessing=False):
-        # import copy
-        # self._data.remove_indicators()
-        # s = time.time()
-
-        # [copy.copy(self._data) for _ in tqdm(range(50))]
-        # print(time.time() -s )
-        # assert False
-
-        # backtesting a range of instances (maybe this should be a separate function?)
-        results = []
-        # TODO: if not iterable, set exact to list of length 1
-        # TODO: multiprocessing
-
+    def backtest_strategies(self, strategy_params, indicator_params, multiprocessing=True):
         # get all combinations of algorithm paramters
         param, val = zip(*strategy_params.items())
         strategy_comb = [dict(zip(param, v)) for v in itertools.product(*val)]
 
-        # precompute all indicators and store in dictionary
-        indicator_maps = {indicator: dict() for indicator in indicator_params}
-        # total_indicator_comb = 1
+        # # precompute all indicators and store in dictionary
         len_indicator_comb = sum(len(values) for paramters in indicator_params.values() for values in paramters.values())     
+
+        indicator_comb = collections.defaultdict(list)
 
         with tqdm(total=len_indicator_comb, desc="Precomputing indicator variants.") as bar:
             for indicator, paramters in indicator_params.items():
@@ -136,45 +117,29 @@ class Backtester:
                 permutations_dicts = [dict(zip(param, v))
                                 for v in itertools.product(*val)]
 
-                # total_indicator_comb *= len(permutations_dicts)
-
                 for perm in permutations_dicts:
-                    indicator_maps[indicator][tuple(perm.values())] = self._data.calc_indicator(self._strategy, indicator, perm)
+
+                    self._cache_indicator(indicator, perm)
+                    indicator_comb[indicator].append(perm)
                     bar.update(1)
-            
+
         # get every combination of different indicators
-        permutations_comb = [_ for _ in itertools.product( *indicator_maps.values())]
-        combined_comb = itertools.product(strategy_comb, permutations_comb)
+        trials = [dict(zip(indicator_comb.keys(), c)) for c in itertools.product(*indicator_comb.values())]
+        s = time()
 
-        '''
-        define new function that
-            - updates indicator params
-            - creates new indicators
-            - adds indicators to data explicitly
-            - runs algorithm
-            - returns results of run
-        '''
-        res = []
-        for perm in permutations_comb:
+        # run
+        if not multiprocessing:
+            res = []
+            for alg_params, ind_params in itertools.product(strategy_comb, trials):
+                res.append(self.run(algorithm_params=alg_params, indicator_params=ind_params, progressbar=False))
+        else:
+            with Pool(processes=1) as p:
+                res = p.map(self.run_wrapper, [(alg_params, ind_params) for alg_params, ind_params in itertools.product(strategy_comb, trials)])
 
-            self._indicator_params.update({ind: dict(zip(indicator_params[ind].keys(), x)) for ind, x in zip(indicator_params.keys(), perm)})
-
-            new_indicators = {i: indicator_maps[i][c] for i, c in zip(indicator_params.keys(), perm)}
-
-            self._data.add_indicators_explicit(new_indicators)
-            
-            if multiprocessing:
-                for alg_params in strategy_comb:
-                    res.append(self.run(algorithm_params=alg_params, progressbar=False))
-                continue
-
-            # TODO add params to results
-            with Pool(processes=2) as p:
-                res = p.map(self.run_wrapper, [(self, strat) for strat in strategy_comb])
-
-                # self.run(algorithm_params=strat, progressbar=False)
+        print(time() - s)
+        print(res)
         
-            print(res)
+        return res
 
     '''
     Backtests the stored strategy. 
@@ -217,19 +182,19 @@ class Backtester:
 
         zipped = zip(self._data, indicators)
         it = tqdm(iter(zipped), total = len(self._data)) if progressbar else iter(zipped)
-        for (curr_prices, all_prices), indicators in it:
-            algorithm.run_on_data(curr_prices, all_prices, indicators, portfolio)
+        for params in it:
+            algorithm.run_on_data(params, portfolio)
         # print(portfolio)
 
-        ret = Result()
-        df_ret = portfolio.history
-        df_ret['time'] = pd.DatetimeIndex(self._data.index)
-        ret.hist = df_ret
+        # ret = Result()
+        # df_ret = portfolio.history
+        # df_ret['time'] = pd.DatetimeIndex(self._data.index)
+        # ret.hist = df_ret
 
-        ret.fee = self._fee
-        ret.indicator_params = self._indicator_params.copy()
-        ret.algorithm_params = self._algorithm_params.copy()
-        ret.initial_balance = self._starting_cash
+        # ret.fee = self._fee
+        # ret.indicator_params = self._indicator_params.copy()
+        # ret.algorithm_params = self._algorithm_params.copy()
+        # ret.initial_balance = self._starting_cash
 
         # self._analyser.parse_result(ret)
         return portfolio.cash
