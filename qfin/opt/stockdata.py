@@ -60,9 +60,6 @@ class StockData:
         
         return self._prices[self._i-1], self.sis
 
-    @property
-    def indicators(self):
-        return self._indicators
 
     @property
     def index(self):
@@ -72,47 +69,5 @@ class StockData:
         self._data = np.concatenate(
             [df.loc[:, df.columns != 'time'].to_numpy() for df in self._stock_df.values()], axis=1).astype('float64')
 
-    def remove_indicator(self, name):
-        if name in self._indicators:
-            self._indicators.remove(name)
-        for stock in self._prices:
-            del self._stock_df[stock][name]
-    
-    def remove_indicators(self):
-        for name in self._indicators:
-            self.remove_indicator(name)
-    
-    def add_indicators(self, strategy, to_update):
-
-        for indicator, params in to_update.items():
-            if indicator not in self._indicators:
-                self._indicators.append(indicator)
-
-            func = strategy.indicator_functions()[indicator]
-
-            for stock in self._stock_df:
-                # TODO: add time data back in??
-                df = self._stock_df[stock]
-
-                kwargs = dict() if not params else params
-
-                # self._stock_indicators[stock][indicator] = func(df, kwargs)
-                self._stock_df[stock][indicator] = func(df, **kwargs)
-
-                # print('add indicator', func(df, **kwargs),
-                #       self._stock_indicators[stock][indicator])
-            self.compress_data()
-
-    def calc_indicator(self, strategy, indicator, kwargs):
-        # TODO: security
-        func = strategy.indicator_functions()[indicator]
-        return {stock: func(self._stock_df[stock], **kwargs).to_numpy() for stock in self._stock_df}
-        
-    def add_indicators_explicit(self, indicators):
-        # TODO: security
-        for indicator, stock_values in indicators.items():
-            for stock, values in stock_values.items():
-                self._stock_df[stock][indicator] = values
-        self.compress_data()
 
 

@@ -22,6 +22,7 @@ class Algorithm:
         return {k: v for k, v in inspect.getmembers(cls)
                 if callable(v) and hasattr(getattr(cls, k), 'indicator') and not k.startswith('__')}
 
+
     def set_indicator_params(self, params):
         # TODO raise error if not dict
         self.indicator_parameters.update(params)
@@ -35,10 +36,10 @@ class Algorithm:
 #        self._indicator_funcs[name] = func
 
 
-    def run_on_data(self, curr_prices, data, portfolio):
+    def run_on_data(self, curr_prices, prices, indicators, portfolio):
         portfolio.curr_prices = curr_prices
-        self.on_data(data, portfolio)
+        self.on_data((prices, indicators), portfolio)
 
     # to override
-    def on_data(self, data: dict, portfolio: Portfolio) -> None:
+    def on_data(self, prices: dict, indicators: dict, portfolio: Portfolio) -> None:
         return

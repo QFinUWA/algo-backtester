@@ -8,20 +8,29 @@ from functools import partial
 import math
 from time import time
 
+from .opt.indicator import Indicators
+
 class Backtester:
 
     def __init__(self, strategy, stocks, data=r'\data', tests=20, cash=1000, fee=0.001):
 
         self._strategy = strategy
-        self._x = data
         self._data = StockData(stocks, data)
         self._stocks = stocks
         self._update_indicators = list()
-        self._cash = cash
+
         self._fee = fee
+        self._starting_cash = cash
+        
+        self._analyser = Analyser()
+        self._indicator_data = Indicators(stocks)
+
         self._algorithm_params = dict()
         self._indicator_params = dict()
-        self._analyser = Analyser()
+
+
+        self._default_indicator_params = dict()
+        self._indicator_cache = dict()
 
     @property
     def fee(self):
@@ -34,6 +43,9 @@ class Backtester:
     '''
     Marks indicators as needing to be updated.
     '''
+    def __str__(self):
+        return str(self._indicator_cache)
+
 
     def update_indicators(self, only=None):
 
@@ -53,16 +65,40 @@ class Backtester:
 
         # TODO unsecure
         to_update = {k: v for k, v in params.items(
-        ) if k not in self._indicator_params or self._indicator_params.get(k, None) != v}
+        ) if k not in self._default_indicator_params or self._default_indicator_params.get(k, None) != v}
 
         if len(to_update) == 0:
             return
+        self._default_indicator_params = params
 
-        self._data.add_indicators(self._strategy, to_update)
-        self._indicator_params.update(params)
+        for indicator, i_params in params.items():
+            self._cache_indicator(indicator, i_params)
+
+    def _cache_indicator(self, indicator, i_params):
+
+        if self._indicator_cached(indicator, i_params):
+            return
+
+        i_params_tuple = self.params_to_hashable(i_params)
+
+        if indicator not in self._indicator_cache:
+            self._indicator_cache[indicator] = dict()
+
+        indicator_functions = self._strategy.indicator_functions()
+        self._indicator_cache[indicator][i_params_tuple] = {stock: indicator_functions[indicator](self._data._stock_df[stock], **i_params) for stock in self._stocks}
+
+    def _indicator_cached(self, indicator, params):
+        if indicator not in self._indicator_cache:
+            return False
+        return self.params_to_hashable(params) in self._indicator_cache[indicator]
+
+    def _get_indicator(self, indicator, params):
+        return self._indicator_cache[indicator][self.params_to_hashable(params)]
+
+    def params_to_hashable(self, params):
+        return tuple(sorted([(p, v) for p, v in params.items()]))
 
     def run_wrapper(self, alg_params):
-
         self.run(algorithm_params=alg_params, progressbar=False)
 
     '''
@@ -70,12 +106,14 @@ class Backtester:
     '''
 
     def backtest_strategies(self, strategy_params, indicator_params, multiprocessing=False):
-        import copy
-        self._data.remove_indicators()
-        s = time.time()
-        [copy.copy(self._data) for _ in tqdm(range(50))]
-        print(time.time() -s )
-        assert False
+        # import copy
+        # self._data.remove_indicators()
+        # s = time.time()
+
+        # [copy.copy(self._data) for _ in tqdm(range(50))]
+        # print(time.time() -s )
+        # assert False
+
         # backtesting a range of instances (maybe this should be a separate function?)
         results = []
         # TODO: if not iterable, set exact to list of length 1
@@ -147,26 +185,40 @@ class Backtester:
         if bool(algorithm_params):
             if not isinstance(algorithm_params, dict):
                 raise TypeError(f'algorithm_params must be of type dict, not {type(algorithm_params)}')
-            self.set_algorithm_params(algorithm_params)
+        else:
+            if not self._algorithm_params:
+                raise ValueError('No default algorithm parameters specified')
+            algorithm_params = self._algorithm_params
 
-        
+
         if bool(indicator_params):
             if not isinstance(algorithm_params, dict):
                 raise TypeError(f'indicator_params must be of type dict, not {type(indicator_params)}')
-            self.set_indicator_params(indicator_params)
+        else:
+            if not self._default_indicator_params:
+                raise ValueError('No default indicator parameters specified')
+            indicator_params = self._default_indicator_params
 
-        algorithm = self._strategy(*tuple(), **self._algorithm_params or None)
 
         # TODO check instaniated
-
         # backtesting an instance of a strategy
 
-        portfolio = Portfolio(self._stocks, self._cash,
+        portfolio = Portfolio(self._stocks, self._starting_cash,
                               self._fee, len(self._data))
 
-        it = tqdm(iter(self._data)) if progressbar else iter(self._data)
-        for curr_prices, all_prices in it:
-            algorithm.run_on_data(curr_prices, all_prices, portfolio)
+        algorithm = self._strategy(*tuple(), **algorithm_params or None)
+        indicators = Indicators(self._stocks)
+        is_cached = {indicator for indicator, params in indicator_params.items() if self._indicator_cached(indicator, params)}
+        indicators.add_indicators({indicator: self._get_indicator(indicator, params) for indicator, params in indicator_params.items() if indicator in is_cached})
+
+        # caclulate indicators 
+        # TODO: only calculate indicators that are needed
+        # indicators.add_indicators(self._strategy, self._data, self._indicator_params)
+
+        zipped = zip(self._data, indicators)
+        it = tqdm(iter(zipped), total = len(self._data)) if progressbar else iter(zipped)
+        for (curr_prices, all_prices), indicators in it:
+            algorithm.run_on_data(curr_prices, all_prices, indicators, portfolio)
         # print(portfolio)
 
         ret = Result()
@@ -177,10 +229,10 @@ class Backtester:
         ret.fee = self._fee
         ret.indicator_params = self._indicator_params.copy()
         ret.algorithm_params = self._algorithm_params.copy()
-        ret.initial_balance = self._cash
+        ret.initial_balance = self._starting_cash
 
         # self._analyser.parse_result(ret)
-        return self._cash
+        return portfolio.cash
 
         
 class Analyser:
