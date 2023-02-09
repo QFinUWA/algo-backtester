@@ -3,12 +3,19 @@ from tqdm import tqdm
 from .opt.portfolio import Portfolio
 from .opt.stockdata import StockData
 import pandas as pd
-from multiprocessing import Pool
+from multiprocessing import Pool, managers
+from multiprocessing.managers import BaseManager
 from functools import partial
 import math
 from time import time
 import collections
 from .opt.indicator import Indicators
+import numpy as np
+import os 
+
+class CustomManager(BaseManager):
+    # nothing
+    pass
 
 class Backtester:
 
@@ -32,6 +39,7 @@ class Backtester:
         self._default_indicator_params = dict()
         self._indicator_cache = dict()
 
+        self._x = data
     @property
     def fee(self):
         return self._fee
@@ -95,8 +103,10 @@ class Backtester:
         return tuple(sorted([(p, v) for p, v in params.items()]))
 
     def run_wrapper(self, args):
-        alg_params, ind_params = args
-        return self.run(algorithm_params = alg_params, indicator_params = ind_params, progressbar=False)
+        print(args)
+        return
+        alg_params, ind_params, = data
+        return self.run(algorithm_params = alg_params, indicator_params = ind_params, data_iterator=it, progressbar=False)
 
 
     def backtest_strategies(self, strategy_params, indicator_params, multiprocessing=True):
@@ -127,18 +137,36 @@ class Backtester:
         trials = [dict(zip(indicator_comb.keys(), c)) for c in itertools.product(*indicator_comb.values())]
         s = time()
 
+        # 
         # run
+        res = []
+        print('Running backtests...')
+        for alg_params, ind_params in itertools.product(strategy_comb, trials):
+            print(alg_params, ind_params)
+            res.append(self.run(algorithm_params=alg_params, indicator_params=ind_params, progressbar=False))
+        
+        return res
+        
         if not multiprocessing:
             res = []
+            print('Running backtests...')
             for alg_params, ind_params in itertools.product(strategy_comb, trials):
+                print(alg_params, ind_params)
                 res.append(self.run(algorithm_params=alg_params, indicator_params=ind_params, progressbar=False))
         else:
-            with Pool(processes=1) as p:
-                res = p.map(self.run_wrapper, [(alg_params, ind_params) for alg_params, ind_params in itertools.product(strategy_comb, trials)])
-
+            CustomManager.register('StockData', StockData)
+            CustomManager.register('dict', dict)
+            with CustomManager() as manager:
+                stockdata = manager.StockData(self._stocks, self._x)
+                portfolios = [Portfolio(self._stocks, self._starting_cash, self._fee, self._data.len()) for _ in range(len(strategy_comb) * len(trials))]
+                alg = self._strategy
+                indicator_cache = manager.dict(self._indicator_cache)
+                print('Running backtests...')
+                with Pool(processes=4) as p:
+                    res = p.map(run_wrapper, [(portfolios, alg, indicator_cache, strat, ind, stockdata) for (strat, ind), portfolios in zip(itertools.product(strategy_comb, trials), portfolios)])
+# portfolio, algorithm, indicators, algorithm_params, indicator_params, data_iterator
         print(time() - s)
         print(res)
-        
         return res
 
     '''
@@ -180,26 +208,75 @@ class Backtester:
         # TODO: only calculate indicators that are needed
         # indicators.add_indicators(self._strategy, self._data, self._indicator_params)
 
-        zipped = zip(self._data, indicators)
-        it = tqdm(iter(zipped), total = len(self._data)) if progressbar else iter(zipped)
+        zipped = zip([self._data.get(i) for i in range(len(self._data))], indicators)
+        it = tqdm(iter(zipped), total=len(self._data)) if progressbar else iter(zipped)
         for params in it:
             algorithm.run_on_data(params, portfolio)
         # print(portfolio)
 
-        # ret = Result()
-        # df_ret = portfolio.history
-        # df_ret['time'] = pd.DatetimeIndex(self._data.index)
-        # ret.hist = df_ret
+        # TODO - manually close positions
 
+        # ret = Result()
+
+        # ret.time_index = pd.DatetimeIndex(self._data.index)
+        # ret.hist = portfolio.history
         # ret.fee = self._fee
         # ret.indicator_params = self._indicator_params.copy()
         # ret.algorithm_params = self._algorithm_params.copy()
         # ret.initial_balance = self._starting_cash
-
         # self._analyser.parse_result(ret)
-        return portfolio.cash
+        # return ret
+        cash, longs, shorts = portfolio.history
 
-        
+        res = Result(cash, longs, shorts, self._data.index, (algorithm_params, indicator_params), self._stocks, self._fee)
+        print(res)
+        # print(portfolio.history)
+
+
+def run_wrapper(args):
+    portfolio, algorithm, indicators, algorithm_params, indicator_params, data_iterator = args
+    return run(portfolio, algorithm, indicators, algorithm_params, indicator_params, data_iterator, progressbar=False)
+
+def get_indicator(cache, indicator, params):
+    return cache.get(indicator).get(params_to_hashable(params))
+
+def params_to_hashable(params):
+    return tuple(sorted([(p, v) for p, v in params.items()]))
+
+def run(portfolio, algorithm, indicator_cache, algorithm_params, indicator_params, stockdata, progressbar=True):
+
+    # TODO check instaniated
+    # backtesting an instance of a strategy
+
+    algorithm = algorithm(*tuple(), **algorithm_params or None)
+    indicators = Indicators(portfolio._stocks)
+    indicators.add_indicators({indicator: get_indicator(indicator_cache, indicator, params) for indicator, params in indicator_params.items()})
+
+    # caclulate indicators 
+    # TODO: only calculate indicators that are needed
+    # indicators.add_indicators(self._strategy, self._data, self._indicator_params)
+
+    zipped = zip([stockdata.get(i) for i in range(stockdata.len())], indicators)
+    it = tqdm(iter(zipped)) if progressbar else iter(zipped)
+    for params in it:
+        algorithm.run_on_data(params, portfolio)
+    
+    # print(portfolio)
+
+    # ret = Result()
+    # df_ret = portfolio.history
+    # df_ret['time'] = pd.DatetimeIndex(self._data.index)
+    # ret.hist = df_ret
+
+    # ret.fee = self._fee
+    # ret.indicator_params = self._indicator_params.copy()
+    # ret.algorithm_params = self._algorithm_params.copy()
+    # ret.initial_balance = self._starting_cash
+
+    
+    return portfolio.cash
+
+
 class Analyser:
 
     def __init__(self):
@@ -211,25 +288,70 @@ class Analyser:
 
         # store in hdf5 file format
         with pd.HDFStore(f'del/{self._i:02}.hdf5') as store:
-            store.put('results', result.hist)
+            print(f"Saving to {f'del/{self._i:02}.hdf5'}")
+            cash_hist, df = result.hist
+            df = pd.DataFrame(df)
+            store.put('results', df)
+            store.put('time_index', pd.Series(result.time_index))
+            store.put('cash_history', pd.Series(cash_hist))
             store.get_storer('results').attrs.metadata = {"fee": result.fee, 
                                                         "indicator_params": result.indicator_params, 
                                                         "algorithm_params": result.algorithm_params,
-                                                        "initial_balance": result.initial_balance,
                                                         }
             self._i += 1
 
 class Result:
 
-    def __init__(self):
-        self.indicator_params = None
-        self.algorithm_params = None
-        self.hist = None
-        self.fee = None
-        self.initial_balance = None
+    def __init__(self, cash, longs, shorts, time, params, stocks, fee):
+        self.algorithm_params, self.indicator_params = params
+        self.fee = fee
+        self.initial_balance = cash[0]
+
+        self.time_index = time
+
+        self.stats = self.parse(stocks, longs, shorts)
+
+    
+    def parse(self, stocks, longs, shorts):
+
+        # time, stock, profit
+        df = pd.DataFrame()
+
+        for stock in stocks:
+            l = [p for _,s,p in longs if s == stock] or [0]
+            s = [p for _,s,p in shorts if s == stock] or [0]
+
+            m_l = np.mean(l)
+            m_s = np.mean(s)
+
+
+            df[stock] = [
+                        len(l) + len(s),   (m_l + m_s)/2,   np.std(l + s), 
+                        len(l),             m_l,            np.std(l),  
+                        len(s),             m_s,            np.std(s)
+                        ]
+        
+        a_longs, a_shorts = [p for *_,p in longs] or [0], [p for *_,p in shorts] or [0]
+
+        m_l = np.mean(a_longs)
+        m_s = np.mean(a_shorts)
+        
+        df['Total'] = [
+                    len(a_longs) + len(a_shorts),  (m_l + m_s)/2,   np.std(a_longs + a_shorts), 
+                    len(a_longs),                   m_l,            np.std(a_longs),  
+                    len(a_shorts),                  m_s,            np.std(a_shorts)
+                    ]
+
+        df.fillna(0, inplace=True)
+
+        df.index = [f'{b}_{a}' for a,b in itertools.product(['trades', 'longs', 'shorts'], ["n", 'mean_per', 'std'])]
+        
+
+        return df
+                
 
     def __str__(self):
-        return f'{self.indicator_params}\n{self.algorithm_params}\n{self.fee}\n{self.initial_balance}'
+        return f'{self.algorithm_params}\n{self.indicator_params}\nStarting Balance:\t{self.initial_balance}\nFee:\t\t\t{self.fee}\n{self.stats}'
 
 
 

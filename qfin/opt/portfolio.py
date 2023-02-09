@@ -20,17 +20,36 @@ class Portfolio:
         self._stock_to_id = {stock: i for i, stock in enumerate(stocks)}
 
         # self._short_value = 0
-        self._longs = {stock: 0 for stock in stocks}
+        self._longs = {stock: [] for stock in stocks}
         # maybe make a heap or linked list??
         self._shorts = {stock: [] for stock in stocks}
         # history is an array of every buy/sell order
         # stock 0's entry is at row indexes (0, 1, 2, 3) for (long_buy, short_buy, long_sell, short_sell)
 
-        pos_types = ['long', 'sell', 'short', 'cover']
-        self._history_cols = [
-            'balance'] + [f'{stock}_{longs}' for stock, longs in product(self._stocks, pos_types)]
-        self._history = np.zeros((ticks, 1 + len(stocks)*4))
 
+        # fees = (int)
+        # enter_long (time, stock, cost, quantity)
+        # exit_long (time, stock, profit, quantity)
+        # enter_short (time, stock, cost, quantity)
+        # exit_short (time, stock, profit, quantity)
+
+        # pos_types = ['long', 'sell', 'short', 'cover']
+
+        self._cash_history = []
+
+        # self._history_cols = [
+        #     'balance'] + [f'{stock}_{longs}' for stock, longs in product(self._stocks, pos_types)]
+        # self._history = np.zeros((ticks, 1 + len(stocks)*4))
+
+        self.long_stats = []
+        self.short_stats = []       
+
+
+
+    @property
+    def stocks(self):
+        return self._stocks
+        
     @property
     def curr_prices(self):
         return self._curr_prices
@@ -38,8 +57,8 @@ class Portfolio:
     @curr_prices.setter
     def curr_prices(self, prices):
         self._i += 1
-        self._history[self._i, 0] = self._cash
         self._curr_prices = prices
+        self._cash_history.append(self._cash)
 
     @property
     def cash(self):
@@ -49,12 +68,17 @@ class Portfolio:
     def cash(self, _):
         raise ValueError('Cannot modify Portfolio.cash ... you cheeky bugger')
 
+    # @property
+    # def history(self):
+    #     df = pd.DataFrame(np.array(self._history), columns=self._history_cols)
+    #     df['balance'] = df['balance'].shift(-1)
+    #     df.iloc[-1,  0] = self._cash
+    #     return df
+
     @property
     def history(self):
-        df = pd.DataFrame(np.array(self._history), columns=self._history_cols)
-        df['balance'] = df['balance'].shift(-1)
-        df.iloc[-1,  0] = self._cash
-        return df
+        return (self._cash_history, self.long_stats, self.short_stats)
+
 
     def __str__(self):
         t = PrettyTable(['Stock', 'Longs', 'Shorts'])
@@ -64,9 +88,9 @@ class Portfolio:
             
         return f'${self._cash}\n' + str(t)
 
-    def _add_to_history(self,  stock,  sell,  amount):
-        j = 1 + self._stock_to_id[stock]*4 + sell
-        self._history[self._i, j] += amount
+    # def _add_to_history(self,  stock,  sell,  amount):
+    #     j = 1 + self._stock_to_id[stock]*4 + sell
+    #     self._history[self._i, j] += amount
 
     def enter_long(self,  stock,  quantity=None, cost=None):
 
@@ -86,30 +110,69 @@ class Portfolio:
 
         self._cash -= cost
 
-        self._longs[stock] += quantity
-        self._add_to_history(stock, 0, quantity)
+        # self._longs[stock] += quantity
+        heapq.heappush(self._longs[stock], (cost, quantity))
+        # self.hist.append((self._i, 'buy', stock, cost, quantity))
 
         return 1
 
-    def sell_long(self,  stock,  quantity=None, cost=None):
+    def sell_long(self,  stock,  quantity=None, price=None):
 
-        if not bool(quantity) ^ bool(cost):
+        if not bool(quantity) ^ bool(price):
             raise TypeError('Please input quanity OR cost.')
 
         ##
-        if bool(cost):
-            quantity = cost*self._fee_div/self._curr_prices[stock]
+        if bool(price):
+            quantity = price*self._fee_div/self._curr_prices[stock]
 
         ##
         elif bool(quantity):
             price = quantity*self._curr_prices[stock]*self._fee_div
+
+        ## --------
+        abs_rem = abs_rem_original = quantity if bool(quantity) else price
+        total_pay, total_cost = 0, 0
+
+        # print(stock, quantity, price, self._longs)
+
+        while self._longs[stock]:
+            # no more shorts to sell
+            if abs_rem == 0:
+                break
+
+            cos, quant = self._longs[stock][0]
+
+            # quantity we are decreasing to 0 - if quantity is specified 
+            # we want to keep closing positions until rem_quanity is 0,
+            # same for cost - this is a more consice and neater way to 
+            # do this but could also use an if else pattern with repitition 
+            abs_amount = quant if bool(quantity) else cos
+
+            # cannot sell whole position - sell franction
+            if abs_amount > abs_rem:
+                frac = abs_rem/abs_amount
+                
+                self._longs[stock][0] = cos*(frac-1), quant*(1-frac)
+                total_cost += frac*cos
+                total_pay += frac*quant*self._curr_prices[stock]
+                abs_rem = 0
+                break
+
+            heapq.heappop(self._longs[stock])
+
+            abs_rem -= abs_amount
+            total_cost += cos
+            total_pay += quant*self._curr_prices[stock]
             
-
-        self._cash += price
-
-        self._longs[stock] -= quantity
-        self._add_to_history(stock, 1, quantity)
-
+        if abs_rem == abs_rem_original:
+            # assert False
+            return 0
+        ## -----
+        
+        self._cash += total_pay
+        # print(total_pay, total_cost)
+        self.long_stats.append((self._i, stock, total_pay - total_cost))
+        
         return 1
 
     def enter_short(self,  stock,  quantity=None, cost=None):
@@ -134,10 +197,8 @@ class Portfolio:
 
         heapq.heappush(self._shorts[stock], (-price, quantity))
 
-        self._add_to_history(stock, 2, quantity)
-        # if self._i > 682500:
-        #     print(f'shorted {stock}, {quantity}')
-        #     print(self._short_value, price , self._cash)
+        # self.hist.append((self._i, 'short', stock, price, quantity))
+
         return 1
 
     def cover_short(self, stock, quantity=None, cost=None):
@@ -172,11 +233,10 @@ class Portfolio:
                 frac = abs_rem/abs_amount
                 
                 self._shorts[stock][0] = cos*(frac-1), quant*(1-frac)
-                print( cos*(frac-1), quant*(1-frac))
 
                 deposit += frac*cos
                 cost_to_buy += frac*quant*self._curr_prices[stock]
-
+                abs_rem = 0
                 break
 
             heapq.heappop(self._shorts[stock])
@@ -188,7 +248,8 @@ class Portfolio:
         if abs_rem == abs_rem_original:
             return 0
 
-        self._cash += 2*deposit - self._fee_mult*cost_to_buy 
+        profit = deposit - self._fee_mult*cost_to_buy 
+        self._cash += profit + deposit
 
-        self._add_to_history(stock, 3, quantity)
+        self.short_stats.append((self._i, stock, profit))
         return 1

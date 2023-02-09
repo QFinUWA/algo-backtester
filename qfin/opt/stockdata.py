@@ -6,7 +6,7 @@ from itertools import product
 
 class StockData:
 
-    def __init__(self, stocks, data_folder):
+    def __init__(self, stocks, data):
 
         self._indicators = ['open', 'close', 'high', 'low', 'volume']
         self._i = 0
@@ -19,55 +19,45 @@ class StockData:
 
         self._L = 0
         self._index = None
+
+
         for stock in stocks:
 
-            _df = pd.read_csv(os.path.join(data_folder, f'{stock}.csv'))
+            _df = pd.read_csv(os.path.join(data, f'{stock}.csv'))
             
             if self._L == 0:
                 self._L = len(_df)
                 self._index = _df['time']
 
             self._stock_df[stock] = _df[self._indicators]
-
-        self._data = None
-        self.compress_data()
+        self._data = self.compress_data()
 
         # pre calcualte the price at every iteration for efficiency
         self._prices = np.array([{stock: self._data[i, 1 + s*5]
-                                  for s, stock in enumerate(stocks)} for i in range(self._L)])
+                                for s, stock in enumerate(stocks)} for i in range(self._L)])
 
-        # self._stock_indicators = {stock: {indicator: self._data[:, s*5 + i] for i, indicator in enumerate(
-        #     self._indicators)} for s, stock in enumerate(stocks)}
-
-        self.sinames = None
         self.sis = {s: dict() for s in stocks}
+        self.sinames = [(stock, indicator, i) for i, (stock, indicator) in enumerate(
+                        product(self.sis, self._indicators))]
 
+    def get(self, index):
+
+        for stock, indicator, i in self.sinames:
+            self.sis[stock][indicator] = self._data[:index, i]
+        
+        return self._prices[index-1], self.sis
+
+    def len(self):
+        return self._L
+    
     def __len__(self):
         return self._L
-
-    def __iter__(self):
-        self._i = 0
-        self.sinames = [(stock, indicator, i) for i, (stock, indicator) in enumerate(
-            product(self.sis, self._indicators))]
-        return self
-
-    def __next__(self):
-        self._i += 1
-        if self._i > len(self):
-            raise StopIteration
-        for stock, indicator, i in self.sinames:
-            self.sis[stock][indicator] = self._data[:self._i, i]
-        
-        return self._prices[self._i-1], self.sis
-
 
     @property
     def index(self):
         return self._index
 
     def compress_data(self):
-        self._data = np.concatenate(
+
+        return np.concatenate(
             [df.loc[:, df.columns != 'time'].to_numpy() for df in self._stock_df.values()], axis=1).astype('float64')
-
-
-

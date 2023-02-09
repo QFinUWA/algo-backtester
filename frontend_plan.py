@@ -3,6 +3,8 @@ from qfin.algorithm import Algorithm
 from qfin.backtester import Backtester
 from qfin.API import API
 
+import random
+
 class ExampleAlgorithm(Algorithm):
 
         @Algorithm.indicator
@@ -15,20 +17,25 @@ class ExampleAlgorithm(Algorithm):
 
         def __init__(self, name=None, bruh=None):
             super().__init__()
-            self.i = 0
             self.dir = ['BUY', 'SELL']
 
 
         def on_data(self, data, portfolio):
             prices, indicators = data
             
-            if self.i > 100000:
-                self.dir = self.dir[::-1]
             # return
+            if random.random() > 0.9999:
+                self.dir = self.dir[::-1]
+                # print('swapped')
+
             for stock in prices:
-                if portfolio.enter_short(stock, 2) == 0:
-                    portfolio.cover_short(stock, 2)
-    
+                # if self.dir[0] == 'SELL':
+                #     if portfolio.enter_short(stock, 2) == 0:
+                #         portfolio.cover_short(stock, 2)
+                # else:
+                if portfolio.enter_long(stock, 2) == 0:
+                    portfolio.sell_long(stock, 2)
+        
             return
 
 
@@ -56,13 +63,14 @@ if __name__ == "__main__":
             "cummie": -2,
     }})
 
-    # results = backtester.run()
+    results = backtester.run()
+
 
     # import time
 
     # s = time.time()
-    a_params, i_params = {"name": ['Test'], "bruh": [1,2 ]}, {"vol_difference": {"lookback": [0, 1], "gum": ['a', 'c']}, "cumsum": {"cummie": [-2]}}
-    results = backtester.backtest_strategies(a_params, i_params, multiprocessing=True)
+    # a_params, i_params = {"name": ['Test'], "bruh": [1,2 ]}, {"vol_difference": {"lookback": [0, 1], "gum": ['a', 'c']}, "cumsum": {"cummie": [-2]}}
+    # results = backtester.backtest_strategies(a_params, i_params, multiprocessing=True)
     # print(time.time()-s)
     # results = backtester.run()
 
