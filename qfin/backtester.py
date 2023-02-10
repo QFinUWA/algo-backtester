@@ -9,7 +9,7 @@ from functools import partial
 import math
 from time import time
 import collections
-from .opt.indicator import Indicators
+from .opt.indicators import Indicators
 import numpy as np
 import os 
 
@@ -22,22 +22,22 @@ class Backtester:
     def __init__(self, strategy, stocks, data=r'\data', tests=20, cash=1000, fee=0.001):
 
         self._strategy = strategy
+        print('Fetching data...')
         self._data = StockData(stocks, data)
         self._stocks = stocks
-        self._update_indicators = list()
 
         self._fee = fee
         self._starting_cash = cash
         
         self._analyser = Analyser()
-        self._indicator_data = Indicators(stocks)
 
         self._algorithm_params = dict()
         self._indicator_params = dict()
 
-
         self._default_indicator_params = dict()
-        self._indicator_cache = dict()
+        self._default_indicator_params = dict()
+        print('Creating Indicators')
+        self._indicator_cache = Indicators(stocks)
 
         self._x = data
     @property
@@ -55,15 +55,8 @@ class Backtester:
         return str(self._indicator_cache)
 
 
-    def update_indicators(self, only=None):
-
-        for indicator in (only or self._data.indicators[2:]):
-
-            if indicator not in self._update_indicators:
-                self._update_indicators.append(indicator)
-
     def set_algorithm_params(self, params):
-        self._algorithm_params.update(params)
+        self._algorithm_params = params
 
     def set_indicator_params(self, params):
 
@@ -76,37 +69,14 @@ class Backtester:
         self._default_indicator_params = params
 
         for indicator, i_params in params.items():
-            self._cache_indicator(indicator, i_params)
+            self._indicator_cache.add(indicator, i_params, self._strategy, self._data._stock_df)
 
-    def _cache_indicator(self, indicator, i_params):
 
-        if self._indicator_cached(indicator, i_params):
-            return
-
-        i_params_tuple = self.params_to_hashable(i_params)
-
-        if indicator not in self._indicator_cache:
-            self._indicator_cache[indicator] = dict()
-
-        indicator_functions = self._strategy.indicator_functions()
-        self._indicator_cache[indicator][i_params_tuple] = {stock: indicator_functions[indicator](self._data._stock_df[stock], **i_params) for stock in self._stocks}
-
-    def _indicator_cached(self, indicator, params):
-        if indicator not in self._indicator_cache:
-            return False
-        return self.params_to_hashable(params) in self._indicator_cache[indicator]
-
-    def _get_indicator(self, indicator, params):
-        return self._indicator_cache[indicator][self.params_to_hashable(params)]
-
-    def params_to_hashable(self, params):
-        return tuple(sorted([(p, v) for p, v in params.items()]))
-
-    def run_wrapper(self, args):
-        print(args)
-        return
-        alg_params, ind_params, = data
-        return self.run(algorithm_params = alg_params, indicator_params = ind_params, data_iterator=it, progressbar=False)
+    # def run_wrapper(self, args):
+    #     print(args)
+    #     return
+    #     alg_params, ind_params, = data
+    #     return self.run(algorithm_params = alg_params, indicator_params = ind_params, data_iterator=it, progressbar=False)
 
 
     def backtest_strategies(self, strategy_params, indicator_params, multiprocessing=True):
@@ -200,15 +170,17 @@ class Backtester:
                               self._fee, len(self._data))
 
         algorithm = self._strategy(*tuple(), **algorithm_params or None)
-        indicators = Indicators(self._stocks)
-        is_cached = {indicator for indicator, params in indicator_params.items() if self._indicator_cached(indicator, params)}
-        indicators.add_indicators({indicator: self._get_indicator(indicator, params) for indicator, params in indicator_params.items() if indicator in is_cached})
+        # indicators = Indicators(self._stocks)
+        # is_cached = {indicator for indicator, params in indicator_params.items() if self._indicator_cached(indicator, params)}
+        # indicators.add_indicators({indicator: self._get_indicator(indicator, params) for indicator, params in indicator_params.items() if indicator in is_cached})
 
         # caclulate indicators 
         # TODO: only calculate indicators that are needed
         # indicators.add_indicators(self._strategy, self._data, self._indicator_params)
-
-        zipped = zip([self._data.get(i) for i in range(len(self._data))], indicators)
+        print('Preparing Tests')
+        self._indicator_cache.iterate(indicator_params)
+        zipped = ((self._data.get(i), self._indicator_cache.get(i)) for i in range(len(self._data)))
+        print('Running Tests')
         it = tqdm(iter(zipped), total=len(self._data)) if progressbar else iter(zipped)
         for params in it:
             algorithm.run_on_data(params, portfolio)
@@ -236,12 +208,6 @@ class Backtester:
 def run_wrapper(args):
     portfolio, algorithm, indicators, algorithm_params, indicator_params, data_iterator = args
     return run(portfolio, algorithm, indicators, algorithm_params, indicator_params, data_iterator, progressbar=False)
-
-def get_indicator(cache, indicator, params):
-    return cache.get(indicator).get(params_to_hashable(params))
-
-def params_to_hashable(params):
-    return tuple(sorted([(p, v) for p, v in params.items()]))
 
 def run(portfolio, algorithm, indicator_cache, algorithm_params, indicator_params, stockdata, progressbar=True):
 
@@ -277,28 +243,6 @@ def run(portfolio, algorithm, indicator_cache, algorithm_params, indicator_param
     return portfolio.cash
 
 
-class Analyser:
-
-    def __init__(self):
-        self._i = 0
-        return
-
-    def parse_result(self, result):
-
-
-        # store in hdf5 file format
-        with pd.HDFStore(f'del/{self._i:02}.hdf5') as store:
-            print(f"Saving to {f'del/{self._i:02}.hdf5'}")
-            cash_hist, df = result.hist
-            df = pd.DataFrame(df)
-            store.put('results', df)
-            store.put('time_index', pd.Series(result.time_index))
-            store.put('cash_history', pd.Series(cash_hist))
-            store.get_storer('results').attrs.metadata = {"fee": result.fee, 
-                                                        "indicator_params": result.indicator_params, 
-                                                        "algorithm_params": result.algorithm_params,
-                                                        }
-            self._i += 1
 
 class Result:
 
@@ -355,5 +299,27 @@ class Result:
 
 
 
+class Analyser:
+
+    def __init__(self):
+        self._i = 0
+        return
+
+    def parse_result(self, result):
+
+
+        # store in hdf5 file format
+        with pd.HDFStore(f'del/{self._i:02}.hdf5') as store:
+            print(f"Saving to {f'del/{self._i:02}.hdf5'}")
+            cash_hist, df = result.hist
+            df = pd.DataFrame(df)
+            store.put('results', df)
+            store.put('time_index', pd.Series(result.time_index))
+            store.put('cash_history', pd.Series(cash_hist))
+            store.get_storer('results').attrs.metadata = {"fee": result.fee, 
+                                                        "indicator_params": result.indicator_params, 
+                                                        "algorithm_params": result.algorithm_params,
+                                                        }
+            self._i += 1
 
 
