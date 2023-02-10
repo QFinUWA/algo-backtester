@@ -16,8 +16,6 @@ class Indicators:
     #
     def add(self, indicator, i_params, strategy, data):
 
-
-
         if self._is_cached(indicator, i_params):
             return
 

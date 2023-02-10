@@ -4,6 +4,9 @@ from qfin.backtester import Backtester
 from qfin.API import API
 
 import random
+import matplotlib
+import matplotlib.pyplot as plt
+matplotlib.use('Qt5Agg')
 
 class ExampleAlgorithm(Algorithm):
 
@@ -64,6 +67,9 @@ if __name__ == "__main__":
     }})
 
     results = backtester.run()
+
+    r = results[0]
+    print(r.cash[:20])
 
 
     # import time
