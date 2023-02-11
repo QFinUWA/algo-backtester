@@ -43,6 +43,7 @@ class ExampleAlgorithm(Algorithm):
 
 
 if __name__ == "__main__":
+    print(ExampleAlgorithm.defaults())
     data_folder_dir = r"C:\Users\isaac\Downloads\data"
 
     data_fetcher = API(api_key_path='API_key.txt',
@@ -50,8 +51,11 @@ if __name__ == "__main__":
 
     # data_fetcher.fetch_data(['GOOG', 'AAPL', 'TSLA', 'IBM'])
 
-    backtester = Backtester(ExampleAlgorithm, ['AAPL', 'GOOG'],
-                            data=data_folder_dir,  tests=20, fee=0.01)
+    backtester = Backtester( ['AAPL', 'GOOG'],
+                            data=data_folder_dir,  months=3, fee=0.01)
+
+    backtester.set_algorithm(ExampleAlgorithm)
+
 
     backtester.set_algorithm_params({
         "name": "Test",

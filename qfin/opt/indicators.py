@@ -6,16 +6,47 @@ from itertools import product
 
 class Indicators:
 
-    def __init__(self, stocks):
+    def __init__(self, stocks, data):
 
         self._params = dict()
         self._stocks = stocks
-        self._curr_indicators = None
+
         self._cache = dict()
+        self._data = data
 
+        self._curr_indicators = None 
+        self._default = None
+
+    # TODO
+    
+    
+    @property
+    def defaults(self):
+        return self._default
+
+    def set_default(self, indicators, strategy):
+        print('set', indicators)
+
+        defaults = strategy.defaults()['indicators']
+
+        for indicator, params in defaults.items():
+            defaults[indicator].update(indicators[indicator])
+
+        for indicator, params in defaults.items():
+            if not self._is_cached(indicator, params): 
+                print('added')
+                self.add(indicator, params, strategy)
+        self._default = defaults
+        
+
+    def update_algorithm(self, algorithm):
+        self._cache = dict()
+        self._default = algorithm.defaults()['indicators']
+        for indicator in (self._default):   
+            self.add(indicator, self._default[indicator], algorithm)
     #
-    def add(self, indicator, i_params, strategy, data):
-
+    def add(self, indicator, i_params, strategy):
+        print('adding', indicator, i_params)
         if self._is_cached(indicator, i_params):
             return
 
@@ -25,12 +56,14 @@ class Indicators:
             self._cache[indicator] = dict()
 
         indicator_functions = strategy.indicator_functions()
-        self._cache[indicator][i_params_tuple] = {stock: indicator_functions[indicator](data[stock], **i_params) for stock in data}
+        self._cache[indicator][i_params_tuple] = {stock: indicator_functions[indicator](self._data[stock], **i_params) for stock in self._data}
 
     #
     def _is_cached(self, indicator, params):
+
         if indicator not in self._cache:
             return False
+
         return self.params_to_hashable(params) in self._cache[indicator]
 
     #
@@ -48,6 +81,7 @@ class Indicators:
 
     # we aren't using iterators here because this object needs to be a shared object
     def iterate(self, params):
+        print('iterate', params)
         self._indicators = dict()
         for indicator, i_params in params.items():
             stock_values = self._get_indicator(indicator, i_params)

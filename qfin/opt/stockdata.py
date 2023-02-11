@@ -32,6 +32,7 @@ class StockData:
             self._stock_df[stock] = _df[self._indicators]
         self._data = self.compress_data()
 
+
         # pre calcualte the price at every iteration for efficiency
         self._prices = np.array([{stock: self._data[i, 1 + s*5]
                                 for s, stock in enumerate(stocks)} for i in range(self._L)])
@@ -40,12 +41,22 @@ class StockData:
         self.sinames = [(stock, indicator, i) for i, (stock, indicator) in enumerate(
                         product(self.sis, self._indicators))]
 
+    @property
+    def prices(self):
+        siss = []
+        for index in range(len(self)):
+            A = {stock: dict() for stock in self.sis}
+            for stock, indicator, i in self.sinames:
+                A[stock][indicator] = self._data[:index, i]
+            siss.append(A)
+        return self._prices, siss
+
     def get(self, index):
 
         for stock, indicator, i in self.sinames:
             self.sis[stock][indicator] = self._data[:index, i]
         
-        return self._prices[index-1], self.sis
+        return self.sis
 
     def len(self):
         return self._L

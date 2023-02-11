@@ -22,6 +22,22 @@ class Algorithm:
         return {k: v for k, v in inspect.getmembers(cls)
                 if callable(v) and hasattr(getattr(cls, k), 'indicator') and not k.startswith('__')}
 
+    @classmethod
+    def defaults(cls):
+
+        def get_defaults(func): 
+            signature = inspect.signature(func)
+            return {
+                k: v.default
+                for k, v in signature.parameters.items()
+                if v.default is not inspect.Parameter.empty
+            }
+
+        ret = {'algorithm': get_defaults(cls.__init__)}
+        ret['indicators'] = dict()
+        for name, function in cls.indicator_functions().items():
+            ret['indicators'][name] = get_defaults(function)
+        return ret
 
     def set_indicator_params(self, params):
         # TODO raise error if not dict
@@ -37,7 +53,7 @@ class Algorithm:
 
 
     def run_on_data(self, args, portfolio):
-        (portfolio.curr_prices, data), indicators = args
+        portfolio.curr_prices, data, indicators = args
         self.on_data((data, indicators), portfolio)
 
     # to override

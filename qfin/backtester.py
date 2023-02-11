@@ -12,27 +12,24 @@ from time import time
 import collections
 from .opt.indicators import Indicators
 import numpy as np
-import os 
-import sys
-import copy
 
-class CustomManager(BaseManager):
-    # nothing
-    pass
 
 def run_wrapper(i, portfolio, algorithm, it):
     for params in tqdm(it):
         algorithm.run_on_data(params, portfolio)
+    portfolio.wrap_up()
     return portfolio.history
 
 
 class Backtester:
 
-    def __init__(self, strategy, stocks, data=r'\data', tests=20, cash=1000, fee=0.001):
+    def __init__(self, stocks, data=r'\data', strategy=None, months=3, cash=1000, fee=0.001):
 
-        self._strategy = strategy
         print('Fetching data...')
         self._data = StockData(stocks, data)
+        print('pre')
+        self._precomp_prices = self._data.prices
+
         self._stocks = stocks
 
         self._fee = fee
@@ -43,12 +40,18 @@ class Backtester:
         self._algorithm_params = dict()
         self._indicator_params = dict()
 
-        self._default_indicator_params = dict()
-        self._default_indicator_params = dict()
+
         print('Creating Indicators')
-        self._indicator_cache = Indicators(stocks)
+        self._indicator_cache = Indicators(stocks, self._data._stock_df)
+
+        self._months = months
 
         self._x = data
+
+        self._strategy = None
+        if strategy is not None:
+            self.update_algorithm(strategy)
+            
     @property
     def fee(self):
         return self._fee
@@ -57,35 +60,36 @@ class Backtester:
     def stocks(self):
         return self._data.stocks
 
-    '''
-    Marks indicators as needing to be updated.
-    '''
+    def update_algorithm(self, algorithm):
+        self._strategy = algorithm
+        self._indicator_cache.update_algorithm(algorithm)
+
+
+
     def __str__(self):
         return str(self._indicator_cache)
 
+    
+    @property
+    def algorithm_params(self):
+        x = self._strategy.defaults()['algorithm']
+        x.update(self._algorithm_params)  
+        return x
 
     def set_algorithm_params(self, params):
-        self._algorithm_params = params
 
-    def set_indicator_params(self, params):
-
-        # TODO unsecure
-        to_update = {k: v for k, v in params.items(
-        ) if k not in self._default_indicator_params or self._default_indicator_params.get(k, None) != v}
-
-        if len(to_update) == 0:
-            return
-        self._default_indicator_params = params
-
-        for indicator, i_params in params.items():
-            self._indicator_cache.add(indicator, i_params, self._strategy, self._data._stock_df)
-
+        if not self._strategy:
+            raise ValueError('No algorithm specified')
         
-    # def run_wrapper(self, args):
-    #     print(args)
-    #     return
-    #     alg_params, ind_params, = data
-    #     return self.run(algorithm_params = alg_params, indicator_params = ind_params, data_iterator=it, progressbar=False)
+        self._algorithm_params.update({k:v for k,v in params.items() if k in self._strategy.defaults()['algorithm']})
+
+    @property
+    def indicator_params(self):
+        return self._indicator_cache.defaults
+        
+    def set_indicator_params(self, params):
+        
+        self._indicator_cache.set_default(params, self._strategy)
 
 
     def backtest_strategies(self, strategy_params, indicator_params, multiprocessing=True):
@@ -152,7 +156,7 @@ class Backtester:
     Backtests the stored strategy. 
     '''
 
-    def run(self, algorithm_params = None, indicator_params = None, progressbar=True):
+    def run(self, algorithm_params = None, indicator_params = None, progressbar=True, cv=1):
 
         if bool(algorithm_params):
             if not isinstance(algorithm_params, dict):
@@ -160,17 +164,17 @@ class Backtester:
         else:
             if not self._algorithm_params:
                 raise ValueError('No default algorithm parameters specified')
-            algorithm_params = self._algorithm_params
+            algorithm_params = self.algorithm_params
 
 
         if bool(indicator_params):
             if not isinstance(algorithm_params, dict):
                 raise TypeError(f'indicator_params must be of type dict, not {type(indicator_params)}')
         else:
-            if not self._default_indicator_params:
+            if not self._indicator_cache.defaults:
                 raise ValueError('No default indicator parameters specified')
-            indicator_params = self._default_indicator_params
-
+            indicator_params = self._indicator_cache.defaults
+            print('def', indicator_params)
 
         # TODO check instaniated
         # backtesting an instance of a strategy
@@ -186,7 +190,9 @@ class Backtester:
         print('Preparing Tests')
         self._indicator_cache.iterate(indicator_params)
 
-        zipped = [(self._data.get(i), self._indicator_cache.get(i)) for i in range(len(self._data))]
+        # TODO: cache this
+        self._data.index 
+
         # print the size of zipped in bytes
 
         # print('Populating process data')
@@ -200,7 +206,7 @@ class Backtester:
 
         portfolio = Portfolio(self._stocks, self._starting_cash, self._fee)
         algorithm = self._strategy(*tuple(), **algorithm_params or None)
-        tests = zipped
+        tests = [(prices, data, self._indicator_cache.get(i)) for i, (prices, data) in enumerate(zip(*self._precomp_prices))]
 
         ret = run_wrapper(0, portfolio, algorithm, tests)
         all_results = [Result(cash,  self._data.index, self._fee, self._stocks, (algorithm_params, indicator_params),  transactions=transactions) for cash, *transactions in [ret]]
@@ -232,46 +238,6 @@ class Backtester:
         # res = Result(cash, longs, shorts, self._data.index, (algorithm_params, indicator_params), self._stocks, self._fee)
         # print(res)
         # print(portfolio.history)
-
-
-# def run_wrapper(args):
-#     portfolio, algorithm, indicators, algorithm_params, indicator_params, data_iterator = args
-#     return run(portfolio, algorithm, indicators, algorithm_params, indicator_params, data_iterator, progressbar=False)
-
-def run(portfolio, algorithm, indicator_cache, algorithm_params, indicator_params, stockdata, progressbar=True):
-
-    # TODO check instaniated
-    # backtesting an instance of a strategy
-
-    algorithm = algorithm(*tuple(), **algorithm_params or None)
-    indicators = Indicators(portfolio._stocks)
-    indicators.add_indicators({indicator: get_indicator(indicator_cache, indicator, params) for indicator, params in indicator_params.items()})
-
-    # caclulate indicators 
-    # TODO: only calculate indicators that are needed
-    # indicators.add_indicators(self._strategy, self._data, self._indicator_params)
-
-    zipped = zip([stockdata.get(i) for i in range(stockdata.len())], indicators)
-    it = tqdm(iter(zipped)) if progressbar else iter(zipped)
-    for params in it:
-        algorithm.run_on_data(params, portfolio)
-    
-    # print(portfolio)
-
-    # ret = Result()
-    # df_ret = portfolio.history
-    # df_ret['time'] = pd.DatetimeIndex(self._data.index)
-    # ret.hist = df_ret
-
-    # ret.fee = self._fee
-    # ret.indicator_params = self._indicator_params.copy()
-    # ret.algorithm_params = self._algorithm_params.copy()
-    # ret.initial_balance = self._starting_cash
-
-    
-    return portfolio.cash
-
-
 
 class Result:
 
@@ -324,7 +290,7 @@ class Result:
                 
 
     def __str__(self):
-        return f'{self.params[0]}\n{self.params[1]}\nStarting Balance:\t{self.cash[-1]}\nFee:\t\t\t{self.fee}\n{self.stats}'
+        return f'{self.params[0]}\n{self.params[1]}\nStarting Balance:\t{self.cash[0]}\nFee:\t\t\t{self.fee}\n{self.stats}'
 
 
     def __add__(self, other):

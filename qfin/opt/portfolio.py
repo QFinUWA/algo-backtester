@@ -20,7 +20,6 @@ class Portfolio:
         # maybe make a heap or linked list??
         self._shorts = {stock: [] for stock in stocks}
 
-
         self._cash_history = []
 
         self.long_stats = []
@@ -42,7 +41,6 @@ class Portfolio:
 
         v_shorts = -1*sum(2*cos + self._fee_mult * q* self._curr_prices[stock] for stock in self._shorts for cos, q in self._shorts[stock])
         v_longs = self._fee_div *sum( q * self._curr_prices[stock] for stock in self._longs for  _, q in self._longs[stock])
-        # print(f'cash: {self._cash}, v_longs: {v_longs}, v_shorts: {v_shorts}')
         self._cash_history.append(self._cash + v_longs + v_shorts)
 
     @property
@@ -57,6 +55,14 @@ class Portfolio:
     def history(self):
         return (self._cash_history, self.long_stats, self.short_stats)
 
+    def wrap_up(self):
+        l_remaining  = {stock: sum(q for _,q in self._longs[stock]) for stock in self._stocks}
+        s_remaining = {stock: sum(q for _,q in self._shorts[stock]) for stock in self._stocks}
+
+        for stock in self._stocks:
+            self.sell_long(stock, quantity=l_remaining[stock])
+            self.cover_short(stock, quantity=s_remaining[stock])
+    
 
     def __str__(self):
         t = PrettyTable(['Stock', 'Longs', 'Shorts'])
@@ -68,15 +74,18 @@ class Portfolio:
 
     def enter_long(self,  stock: str, quantity: float=None, cost: float=None) -> int:
 
-        if not bool(quantity) ^ bool(cost):
+        quantity_bool = quantity is not None
+        cost_bool = cost is not None
+
+        if not quantity_bool ^ cost_bool:
             raise TypeError('Please input quanity OR cost.')
 
         ##
-        if bool(cost):
+        if cost_bool:
             quantity = cost*self._fee_div/self._curr_prices[stock]
         
         ##
-        elif bool(quantity):
+        elif quantity_bool:
             cost = quantity*self._curr_prices[stock]*self._fee_mult
 
         if cost > self._cash:
@@ -88,21 +97,24 @@ class Portfolio:
 
         return 1
 
-    def sell_long(self,  stock: str, quantity: float=None, price: float=None) -> int:
+    def sell_long(self,  stock: str, quantity: float=None, price : float=None) -> int:
+        
+        quantity_bool = quantity is not None
+        price_bool = price is not None
 
-        if not bool(quantity) ^ bool(price):
+        if not quantity_bool ^ price_bool:
             raise TypeError('Please input quanity OR cost.')
 
         ##
-        if bool(price):
+        if price_bool:
             quantity = price*self._fee_div/self._curr_prices[stock]
 
         ##
-        elif bool(quantity):
+        elif quantity_bool:
             price = quantity*self._curr_prices[stock]*self._fee_div
 
         ## --------
-        abs_rem = abs_rem_original = quantity if bool(quantity) else price
+        abs_rem = abs_rem_original = quantity if quantity_bool else price
         total_pay, total_cost = 0, 0
 
         while self._longs[stock]:
@@ -116,7 +128,7 @@ class Portfolio:
             # we want to keep closing positions until rem_quanity is 0,
             # same for cost - this is a more consice and neater way to 
             # do this but could also use an if else pattern with repitition 
-            abs_amount = quant if bool(quantity) else cos
+            abs_amount = quant if quantity_bool else cos
 
             # cannot sell whole position - sell franction
             if abs_amount > abs_rem:
@@ -145,15 +157,18 @@ class Portfolio:
 
     def enter_short(self, stock: str, quantity: float=None, cost: float=None) -> int:
 
-        if not bool(quantity) ^ bool(cost):
+        quantity_bool = quantity is not None
+        cost_bool = cost is not None
+
+        if not quantity_bool ^ cost_bool:
             raise TypeError('Please input quanity OR cost.')
 
         ##
-        if bool(cost):
+        if cost_bool:
             quantity = cost*self._fee_div/self._curr_prices[stock]
 
         ##
-        elif bool(quantity):
+        elif quantity_bool:
             price = quantity*self._curr_prices[stock]*self._fee_mult
     
         if price > self._cash:
@@ -168,15 +183,16 @@ class Portfolio:
 
     def cover_short(self, stock: str, quantity: float=None, cost: float=None) -> int:
 
-        bool_quantity, bool_cost = bool(quantity), bool(cost)
+        quantity_bool = quantity is not None
+        cost_bool = cost is not None
 
-        if not bool_quantity ^ bool_cost:
+        if not quantity_bool ^ cost_bool:
             raise TypeError('Please input quanity OR cost.')
   
         cost_to_buy = 0
         deposit = 0
         
-        abs_rem = abs_rem_original = quantity if bool_quantity else cost
+        abs_rem = abs_rem_original = quantity if quantity_bool else cost
         while self._shorts[stock]:
             # no more shorts to sell
             if abs_rem == 0:
@@ -190,7 +206,7 @@ class Portfolio:
             # we want to keep closing positions until rem_quanity is 0,
             # same for cost - this is a more consice and neater way to 
             # do this but could also use an if else pattern with repitition 
-            abs_amount = quant if bool_quantity else cos
+            abs_amount = quant if quantity_bool else cos
 
             # cannot sell whole position - sell franction
             if abs_amount > abs_rem:
