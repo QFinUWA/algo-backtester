@@ -17,8 +17,10 @@ class Portfolio:
 
         # self._short_value = 0
         self._longs = {stock: [] for stock in stocks}
+        self._n_longs = {stock: 0 for stock in stocks}
         # maybe make a heap or linked list??
         self._shorts = {stock: [] for stock in stocks}
+        self._n_shorts = {stock: 0 for stock in stocks}
 
         self._cash_history = []
 
@@ -29,6 +31,10 @@ class Portfolio:
     @property
     def stocks(self):
         return self._stocks
+
+    @property
+    def holdings(self):
+        return {'longs': self._n_longs, 'shorts': self._n_shorts}
         
     @property
     def curr_prices(self):
@@ -67,7 +73,6 @@ class Portfolio:
     def __str__(self):
         t = PrettyTable(['Stock', 'Longs', 'Shorts'])
         for stock in self._stocks:
-            # print([stock, self._longs[stock], sum(q for _, q in self._shorts[stock])])
             t.add_row([stock, self._longs[stock], sum(q for _, q in self._shorts[stock])])
             
         return f'${self._cash}\n' + str(t)
@@ -92,6 +97,8 @@ class Portfolio:
             return 0
 
         self._cash -= cost
+
+        self._n_longs[stock] += quantity
 
         heapq.heappush(self._longs[stock], (cost, quantity))
 
@@ -135,6 +142,7 @@ class Portfolio:
                 frac = abs_rem/abs_amount
                 
                 self._longs[stock][0] = cos*(frac-1), quant*(1-frac)
+                self._n_longs[stock] -= quant*(1-frac)
                 total_cost += frac*cos
                 total_pay += frac*quant*self._curr_prices[stock]
                 abs_rem = 0
@@ -145,6 +153,7 @@ class Portfolio:
             abs_rem -= abs_amount
             total_cost += cos
             total_pay += quant*self._curr_prices[stock]
+            self._n_longs[stock] -= quant
             
         if abs_rem == abs_rem_original:
             return 0
@@ -177,6 +186,7 @@ class Portfolio:
 
         self._cash -= price
 
+        self._n_shorts[stock] += quantity
         heapq.heappush(self._shorts[stock], (-price, quantity))
 
         return 1
@@ -216,6 +226,7 @@ class Portfolio:
 
                 deposit += frac*cos
                 cost_to_buy += frac*quant*self._curr_prices[stock]
+                self._n_shorts[stock] -= frac*quant
                 abs_rem = 0
                 break
 
@@ -224,6 +235,7 @@ class Portfolio:
             abs_rem -= abs_amount
             deposit += cos
             cost_to_buy += quant*self._curr_prices[stock]
+            self._n_shorts[stock] -= quant
 
         if abs_rem == abs_rem_original:
             return 0

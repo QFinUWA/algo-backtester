@@ -53,8 +53,8 @@ class Algorithm:
 
 
     def run_on_data(self, args, portfolio):
-        portfolio.curr_prices, data, indicators = args
-        self.on_data((data, indicators), portfolio)
+        portfolio.curr_prices, *data = args
+        self.on_data(*data, portfolio)
 
     # to override
     def on_data(self, prices: dict, indicators: dict, portfolio: Portfolio) -> None:

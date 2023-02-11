@@ -1,6 +1,4 @@
 import numpy as np
-import pandas as pd
-import os
 from itertools import product
 
 
@@ -14,8 +12,13 @@ class Indicators:
         self._cache = dict()
         self._data = data
 
+        self._L = len(list(self._data.values())[0])
+
         self._curr_indicators = None 
         self._default = None
+
+        self._indicators_iterations = None
+
 
     # TODO
     
@@ -25,7 +28,6 @@ class Indicators:
         return self._default
 
     def set_default(self, indicators, strategy):
-        print('set', indicators)
 
         defaults = strategy.defaults()['indicators']
 
@@ -34,7 +36,6 @@ class Indicators:
 
         for indicator, params in defaults.items():
             if not self._is_cached(indicator, params): 
-                print('added')
                 self.add(indicator, params, strategy)
         self._default = defaults
         
@@ -46,7 +47,6 @@ class Indicators:
             self.add(indicator, self._default[indicator], algorithm)
     #
     def add(self, indicator, i_params, strategy):
-        print('adding', indicator, i_params)
         if self._is_cached(indicator, i_params):
             return
 
@@ -81,7 +81,6 @@ class Indicators:
 
     # we aren't using iterators here because this object needs to be a shared object
     def iterate(self, params):
-        print('iterate', params)
         self._indicators = dict()
         for indicator, i_params in params.items():
             stock_values = self._get_indicator(indicator, i_params)
@@ -93,12 +92,33 @@ class Indicators:
         self._indexes = product(range(len(self._stocks)), self._indicators)
         self._L = len(self._indicators[list(self._indicators.keys())[0]])
 
-    def get(self, i):
+    def __len__(self):
+        return self._L
 
-        if i >= self._L:
-            raise ValueError(f'Index {i} out of range.')
+    def __iter__(self):
+
+
+        if not self._default:
+            raise ValueError(f'No default parameters found.')
+
+
+        self._indicators_iterations = {indicator: np.stack(list(self._get_indicator(indicator, i_params).values()), axis=1) for indicator, i_params in self._default.items()}
+
+        self._curr_indicators = {stock: {indicator: None for indicator in self._default} for stock in self._stocks}  
+
+        self._indexes = product(range(len(self._stocks)), self._indicators_iterations)
+        self._i = 0
+
+        return self
+
+    def __next__(self):
+
+        if self._i >= len(self):
+            raise ValueError(f'Index {self._i } out of range.')
 
         for s, indicator in self._indexes:  
-            self._curr_indicators[self._stocks[s]][indicator] = self._indicators[indicator][:i, s]
+            self._curr_indicators[self._stocks[s]][indicator] = self._indicators_iterations[indicator][:self._i, s]
+        
+        self._i += 1
         
         return self._curr_indicators

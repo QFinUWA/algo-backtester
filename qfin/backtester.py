@@ -4,30 +4,19 @@ from tqdm import tqdm
 from .opt.portfolio import Portfolio
 from .opt.stockdata import StockData
 import pandas as pd
-from multiprocessing import Pool, Manager
-from multiprocessing.managers import BaseManager
-from functools import partial
-import math
 from time import time
 import collections
 from .opt.indicators import Indicators
 import numpy as np
 
 
-def run_wrapper(i, portfolio, algorithm, it):
-    for params in tqdm(it):
-        algorithm.run_on_data(params, portfolio)
-    portfolio.wrap_up()
-    return portfolio.history
-
-
 class Backtester:
 
     def __init__(self, stocks, data=r'\data', strategy=None, months=3, cash=1000, fee=0.001):
 
-        print('Fetching data...')
+        print('> Fetching data...')
         self._data = StockData(stocks, data)
-        print('pre')
+        print('> Precompiling data...')
         self._precomp_prices = self._data.prices
 
         self._stocks = stocks
@@ -35,18 +24,14 @@ class Backtester:
         self._fee = fee
         self._starting_cash = cash
         
-        self._analyser = Analyser()
-
         self._algorithm_params = dict()
         self._indicator_params = dict()
 
 
-        print('Creating Indicators')
+        print('> Creating Indicators ...')
         self._indicator_cache = Indicators(stocks, self._data._stock_df)
 
         self._months = months
-
-        self._x = data
 
         self._strategy = None
         if strategy is not None:
@@ -174,70 +159,26 @@ class Backtester:
             if not self._indicator_cache.defaults:
                 raise ValueError('No default indicator parameters specified')
             indicator_params = self._indicator_cache.defaults
-            print('def', indicator_params)
-
-        # TODO check instaniated
-        # backtesting an instance of a strategy
-
-        # algorithm = self._strategy(*tuple(), **algorithm_params or None)
-        # indicators = Indicators(self._stocks)
-        # is_cached = {indicator for indicator, params in indicator_params.items() if self._indicator_cached(indicator, params)}
-        # indicators.add_indicators({indicator: self._get_indicator(indicator, params) for indicator, params in indicator_params.items() if indicator in is_cached})
 
         # caclulate indicators 
-        # TODO: only calculate indicators that are needed
-        # indicators.add_indicators(self._strategy, self._data, self._indicator_params)
+
         print('Preparing Tests')
-        self._indicator_cache.iterate(indicator_params)
-
-        # TODO: cache this
-        self._data.index 
-
-        # print the size of zipped in bytes
-
-        # print('Populating process data')
-        # algs = [self._strategy(*tuple(), **algorithm_params or None) for _ in range(N)]
-        # ports = [ for _ in range(N)]
-
-        # print('Starting Tests')
-        # with Pool() as p:
-        #     print('Running Tests')
-        #     ret = p.starmap(run_wrapper, [(i, *args) for i, args in enumerate(zip(ports, algs, tests))])
-
         portfolio = Portfolio(self._stocks, self._starting_cash, self._fee)
         algorithm = self._strategy(*tuple(), **algorithm_params or None)
-        tests = [(prices, data, self._indicator_cache.get(i)) for i, (prices, data) in enumerate(zip(*self._precomp_prices))]
+        tests = list(zip(*self._precomp_prices, self._indicator_cache))
 
-        ret = run_wrapper(0, portfolio, algorithm, tests)
-        all_results = [Result(cash,  self._data.index, self._fee, self._stocks, (algorithm_params, indicator_params),  transactions=transactions) for cash, *transactions in [ret]]
+        #---------[RUN THE ALGORITHM]---------#
+        for params in (tqdm(tests) if progressbar else tests):
+            algorithm.run_on_data(params, portfolio)
+        portfolio.wrap_up()
+        #-------------------------------------#
+
+        all_results = [Result(cash,  self._data.index, self._fee, self._stocks, (algorithm_params, indicator_params),  transactions=transactions) for cash, *transactions in [portfolio.history]]
 
         print(str(sum(all_results[1:], start=all_results[0])))
 
         return all_results
 
-        # it = tqdm(iter(zipped), total=len(self._data)) if progressbar else iter(zipped)
-        # print('Running Tests')
-        # for params in it:
-        #     algorithm.run_on_data(params, portfolio)
-        # print(portfolio)
-
-        # TODO - manually close positions
-
-        # ret = Result()
-
-        # ret.time_index = pd.DatetimeIndex(self._data.index)
-        # ret.hist = portfolio.history
-        # ret.fee = self._fee
-        # ret.indicator_params = self._indicator_params.copy()
-        # ret.algorithm_params = self._algorithm_params.copy()
-        # ret.initial_balance = self._starting_cash
-        # self._analyser.parse_result(ret)
-        # return ret
-        # cash, longs, shorts = portfolio.history
-
-        # res = Result(cash, longs, shorts, self._data.index, (algorithm_params, indicator_params), self._stocks, self._fee)
-        # print(res)
-        # print(portfolio.history)
 
 class Result:
 
@@ -300,28 +241,5 @@ class Result:
         res.stats = (self.stats + other.stats)/2 if not other.stats is None else self.stats
         
         return res
-
-class Analyser:
-
-    def __init__(self):
-        self._i = 0
-        return
-
-    def parse_result(self, result):
-
-
-        # store in hdf5 file format
-        with pd.HDFStore(f'del/{self._i:02}.hdf5') as store:
-            print(f"Saving to {f'del/{self._i:02}.hdf5'}")
-            cash_hist, df = result.hist
-            df = pd.DataFrame(df)
-            store.put('results', df)
-            store.put('time_index', pd.Series(result.time_index))
-            store.put('cash_history', pd.Series(cash_hist))
-            store.get_storer('results').attrs.metadata = {"fee": result.fee, 
-                                                        "indicator_params": result.indicator_params, 
-                                                        "algorithm_params": result.algorithm_params,
-                                                        }
-            self._i += 1
 
 

@@ -5,10 +5,10 @@ from qfin.API import API
 
 import random
 import matplotlib
-import matplotlib.pyplot as plt
+
 matplotlib.use('Qt5Agg')
 
-class ExampleAlgorithm(Algorithm):
+class RandomAlgorithm(Algorithm):
 
         @Algorithm.indicator
         def vol_difference(data, lookback=100, gum = None):
@@ -23,27 +23,19 @@ class ExampleAlgorithm(Algorithm):
             self.dir = ['BUY', 'SELL']
 
 
-        def on_data(self, data, portfolio):
-            prices, indicators = data
-            
-            # return
-            if random.random() > 0.9999:
-                self.dir = self.dir[::-1]
-                # print('swapped')
+        def on_data(self, data, indicators, portfolio):
 
-            for stock in prices:
-                # if self.dir[0] == 'SELL':
-                #     if portfolio.enter_short(stock, 2) == 0:
-                #         portfolio.cover_short(stock, 2)
-                # else:
-                if portfolio.enter_long(stock, 2) == 0:
-                    portfolio.sell_long(stock, 2)
-        
+            for stock in portfolio.stocks:
+                for _ in data: pass
+                for _ in indicators: pass
+                action = [portfolio.enter_long, portfolio.sell_long, portfolio.enter_short, portfolio.cover_short][random.randint(0,3)]
+                action(stock, 1)
+
             return
 
 
 if __name__ == "__main__":
-    print(ExampleAlgorithm.defaults())
+
     data_folder_dir = r"C:\Users\isaac\Downloads\data"
 
     data_fetcher = API(api_key_path='API_key.txt',
@@ -54,7 +46,7 @@ if __name__ == "__main__":
     backtester = Backtester( ['AAPL', 'GOOG'],
                             data=data_folder_dir,  months=3, fee=0.01)
 
-    backtester.set_algorithm(ExampleAlgorithm)
+    backtester.update_algorithm(RandomAlgorithm)
 
 
     backtester.set_algorithm_params({
@@ -73,7 +65,6 @@ if __name__ == "__main__":
     results = backtester.run()
 
     r = results[0]
-    print(r.cash[:20])
 
 
     # import time
