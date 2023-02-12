@@ -1,30 +1,10 @@
-from setuptools import setup, find_packages
-
-# import os
-
-# ext_modules = [Extension("backtester", ["qfin/backtester.pyx"]),
-#                Extension("portfolio", ["qfin/opt/portfolio.pyx"])]
+import setuptools
 
 
-# def find_pyx(path='.'):
-#     pyx_files = []
-#     for root, dirs, filenames in os.walk(path):
-#         for fname in filenames:
-#             if fname.endswith('.pyx'):
-#                 pyx_files.append(os.path.join(root, fname))
-#     return pyx_files
-
-
-setup(name='qfin',
-      version='0.0',
+setuptools.setup(name='qfin',
+      version='0.1',
       description='Framework for backtesting quantitative trading algorithims.',
-      packages=find_packages(),
-      # include_dirs=[numpy.get_include()],
-      # ext_modules=cythonize(["qfin/backtester.pyx",
-      #                        #      "qfin/opt/stockdata.pyx",
-      #                   #      "qfin/cyalgorithm.pyx",
-      #                   #      "qfin/cybacktester.pyx"
-      #                        #      "qfin/opt/portfolio.pyx"
-      #                        ]
-      #                       )
+      package_dir = {"": "src"},
+      packages = setuptools.find_packages(where="src"),
+      python_requires = ">=3.6"
       )
