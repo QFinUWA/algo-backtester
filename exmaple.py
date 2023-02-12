@@ -1,7 +1,7 @@
 # this is for development
-from qfinuwa.algorithm import Algorithm
-from qfinuwa.backtester import Backtester
-from qfinuwa.API import API
+from qfinuwa import Algorithm
+from qfinuwa import Backtester
+from qfinuwa import API
 
 import random
 
