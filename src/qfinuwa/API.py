@@ -2,10 +2,8 @@ import os
 import pandas as pd
 import urllib.parse as urlparse
 from itertools import product
-from tqdm import tqdm
 from multiprocessing.pool import ThreadPool
 from multiprocessing import cpu_count
-from tqdm import tqdm
 
 
 class API:

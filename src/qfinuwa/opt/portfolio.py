@@ -1,5 +1,6 @@
 import heapq
-from prettytable import PrettyTable
+from tabulate import tabulate
+
 
 
 class Portfolio:
@@ -68,14 +69,15 @@ class Portfolio:
         for stock in self._stocks:
             self.sell_long(stock, quantity=l_remaining[stock])
             self.cover_short(stock, quantity=s_remaining[stock])
+        
+        return self.history
     
 
     def __str__(self):
-        t = PrettyTable(['Stock', 'Longs', 'Shorts'])
-        for stock in self._stocks:
-            t.add_row([stock, self._longs[stock], sum(q for _, q in self._shorts[stock])])
-            
-        return f'${self._cash}\n' + str(t)
+        table = str(tabulate([[stock, sum(q for _, q in self._longs[stock]), sum(q for _, q in self._shorts[stock])] for stock in self._stocks], 
+                                headers = ['Stock', 'Longs', 'Shorts'],
+                                tablefmt="grid"))
+        return f'CASH:\t${self._cash:.2f}\n' + table 
 
     def enter_long(self,  stock: str, quantity: float=None, cost: float=None) -> int:
 

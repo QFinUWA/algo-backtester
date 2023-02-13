@@ -1,6 +1,5 @@
 
 import itertools
-from tqdm import tqdm
 from .opt.portfolio import Portfolio
 from .opt.stockdata import StockData
 import pandas as pd
@@ -8,15 +7,29 @@ from time import time
 import collections
 from .opt.indicators import Indicators
 import numpy as np
+import random
+from tabulate import tabulate
+from .opt.result import Result, ResultsContainer
 
+from IPython import get_ipython
+
+try:
+    shell = get_ipython().__class__.__name__
+    if shell in ['ZMQInteractiveShell']:
+        from tqdm import tqdm_notebook as tqdm   # Jupyter notebook or qtconsole or Terminal running IPython  
+    else:
+         from tqdm import tqdm   
+except NameError:
+    from tqdm import tqdm      # Probably standard Python interpreter
+
+    
 
 class Backtester:
 
-    def __init__(self, stocks, data=r'\data', strategy=None, months=3, cash=1000, fee=0.001):
+    def __init__(self, stocks, data=r'\data', strategy=None, days='all', cash=1000, fee=0.001, seed=None):
 
-        print('> Fetching data...')
-        self._data = StockData(stocks, data)
-        print('> Precompiling data...')
+        self._data = StockData(stocks, data, verbose=True)
+
         self._precomp_prices = self._data.prices
 
         self._stocks = stocks
@@ -27,15 +40,21 @@ class Backtester:
         self._algorithm_params = dict()
         self._indicator_params = dict()
 
-
-        print('> Creating Indicators ...')
         self._indicator_cache = Indicators(stocks, self._data._stock_df)
 
-        self._months = months
+        self._days = days
 
         self._strategy = None
         if strategy is not None:
             self.update_algorithm(strategy)
+
+        self.seed = seed
+
+    def update_days(self, days):
+        self._days = days
+
+    def update_seed(self, seed):
+        self.seed = seed
             
     @property
     def fee(self):
@@ -161,85 +180,41 @@ class Backtester:
             indicator_params = self._indicator_cache.defaults
 
         # caclulate indicators 
+        data = list(zip(*self._precomp_prices, self._indicator_cache))
 
-        print('Preparing Tests')
-        portfolio = Portfolio(self._stocks, self._starting_cash, self._fee)
-        algorithm = self._strategy(*tuple(), **algorithm_params or None)
-        tests = list(zip(*self._precomp_prices, self._indicator_cache))
+        random_periods = [0, len(self._data)]*cv if self._days == 'all' else self.get_random_periods(cv) 
 
-        #---------[RUN THE ALGORITHM]---------#
-        for params in (tqdm(tests) if progressbar else tests):
-            algorithm.run_on_data(params, portfolio)
-        portfolio.wrap_up()
-        #-------------------------------------#
+        results = []
 
-        all_results = [Result(cash,  self._data.index, self._fee, self._stocks, (algorithm_params, indicator_params),  transactions=transactions) for cash, *transactions in [portfolio.history]]
-
-        print(str(sum(all_results[1:], start=all_results[0])))
-
-        return all_results
-
-
-class Result:
-
-    def __init__(self, cash, time,  fee, stocks, params, transactions=None):
-        self.params = params
-        self.stocks = stocks
-        self.stats = self.parse(self.stocks, *transactions) if transactions else None
-
-        self.cash = cash
-        self.fee = fee
-        self.time_index = time
-
-
-    def parse(self, stocks, longs, shorts):
-
-        # time, stock, profit
-        df = pd.DataFrame()
-
-        for stock in stocks:
-            l = [p for _,s,p in longs if s == stock] 
-            s = [p for _,s,p in shorts if s == stock] 
-
-            m_l = np.mean(l or [0]) 
-            m_s = np.mean(s or [0]) 
-
-
-            df[stock] = [
-                        len(l) + len(s),   (m_l + m_s)/2,   np.std((l + s) or [0]), 
-                        len(l),             m_l,            np.std(l or [0]),  
-                        len(s),             m_s,            np.std(s or [0])
-                        ]
-        
-        a_longs, a_shorts = [p for *_,p in longs], [p for *_,p in shorts]
-
-        m_l = np.mean(a_longs or [0])
-        m_s = np.mean(a_shorts or [0])
-        
-        df['Total'] = [
-                    len(a_longs) + len(a_shorts),  (m_l + m_s)/2,   np.std((a_longs + a_shorts) or [0]), 
-                    len(a_longs),                   m_l,            np.std(a_longs or [0]),  
-                    len(a_shorts),                  m_s,            np.std(a_shorts or [0])
-                    ]
-
-        df.fillna(0, inplace=True)
-
-        df.index = [f'{b}_{a}' for a,b in itertools.product(['trades', 'longs', 'shorts'], ["n", 'mean_per', 'std'])]
-        
-
-        return df
-                
-
-    def __str__(self):
-        return f'{self.params[0]}\n{self.params[1]}\nStarting Balance:\t{self.cash[0]}\nFee:\t\t\t{self.fee}\n{self.stats}'
-
-
-    def __add__(self, other):
+        desc = f'> Running backtest over {cv} sample{"s" if cv > 1 else ""} of {self._days} day{"s" if cv > 1 else ""}'
+        for start, end in (tqdm(random_periods, desc = desc) if progressbar and cv > 1 else random_periods):
+            portfolio = Portfolio(self._stocks, self._starting_cash, self._fee)
+            algorithm = self._strategy(*tuple(), **algorithm_params or None)
             
-        res = Result(self.cash, self.time_index,  self.fee, self.stocks, self.params, transactions=None)
+            test = data[start:end]
+            #---------[RUN THE ALGORITHM]---------#
+            for params in (tqdm(test, desc=desc) if progressbar and cv == 1 else test):
+                algorithm.run_on_data(params, portfolio)
+            cash, longs, shorts = portfolio.wrap_up()
+            results.append(Result(self._stocks, cash, longs, shorts, self._data.index[start:end]))
+            #-------------------------------------#
 
-        res.stats = (self.stats + other.stats)/2 if not other.stats is None else self.stats
-        
-        return res
+        results = ResultsContainer((algorithm_params, indicator_params), results)
+
+        return results
+
+    def get_random_periods(self, n):
+        rand = random if not self.seed else random.RandomState(self.seed) 
+
+        days = self._data.index.dt.to_period('D').drop_duplicates()
+
+        s_is = rand.sample(range(len(days) - self._days), n)
+
+        starts = (str(days.iloc[s_i]) for s_i in s_is)
+        ends = (str(days.iloc[s_i+self._days]) for s_i in s_is)
+
+        return [(self._data._index[self._data._index >= start].index[0], self._data._index[self._data._index < end].index[-1]) for start, end in zip(starts, ends)]
+
+
 
 

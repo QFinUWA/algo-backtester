@@ -20,6 +20,7 @@ class Indicators:
         self._indicators_iterations = None
 
 
+
     # TODO
     
     
