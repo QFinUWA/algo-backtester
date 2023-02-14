@@ -74,8 +74,8 @@ class ResultsContainer:
     def __init__(self, parameters, results):
         a,i = parameters
         self.parameters = {
-            'algorithm_paramters': a,
-            'indicator_parameters': i
+            'algorithm': a,
+            'indicator': i
         }
 
         self.results = results
@@ -106,3 +106,50 @@ class ResultsContainer:
         table = str(tabulate(self.statistics, headers = 'keys', tablefmt="github", showindex = True, numalign="right"))
         return '\n' + str(self.parameters) + f'\n\nMean ROI:\t{self.roi}\n\n' + '\n'.join([(' -> '.join(res.date_range) + f':\t{res.roi:.3f}') for res in self]) +'\n\n'  + table
 
+
+class SweepResults:
+
+    def __init__(self, container_results):
+
+        a = dict()
+        i = dict()
+        for result in container_results:
+
+            for para, val in result.parameters['algorithm'].items():
+                a[para] = sorted(a.get(para, []) + [val])
+
+            for indic, params in result.parameters['indicator']:
+                i[indic] = i.get(indic, dict())
+
+                for para, val in params:
+                    i[indic][para] = sorted(i[indic].get(para, []) + [val])
+
+
+        self.parameters = {
+            'algorithm_paramters': a,
+            'indicator_parameters': i
+        }
+
+        self.container_results = container_results
+
+    @property
+    def best(self):
+        return max(self.container_results, key=lambda res: res.roi)
+
+    
+    def __getitem__(self, idx):
+
+        return self.container_results[idx]
+
+    def __iter__(self):
+        return self.container_results
+
+    def save(self, filename):
+        with open(filename, 'w') as f:
+            f.write(str(self) )
+
+    def __str__(self):
+
+        # TODO: make look better
+
+        return f'Best parameter results:\n{repr(self.best)}'
