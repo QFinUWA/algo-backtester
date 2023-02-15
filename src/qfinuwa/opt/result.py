@@ -12,10 +12,13 @@ class Result:
         shorts = {stock: [p for _,s,p in shorts if s == stock] for stock in stocks}
         self.longs = {k: (len(v), np.mean(v or [0]), np.std(v or [0])) for k,v in longs.items()}
         self.shorts = {k: (len(v), np.mean(v or [0]), np.std(v or [0])) for k,v in shorts.items()}
-        self._sdv = {stock: np.std(longs[stock] + shorts[stock]) for stock in stocks}
-        self._sdv_longs = np.std([p for *_,p in longs.values()])
-        self._sdv_shorts = np.std([p for *_,p in shorts.values()])
-        self._sdv_all = np.std([p for *_,p in longs.values()] + [p for *_,p in shorts.values()])
+        self._sdv = {stock: np.std(longs[stock] + shorts[stock] or [0]) for stock in stocks}
+
+        std_longs= np.array([longs[s] or [0] for s in longs]).reshape(-1,1)
+        std_shorts = np.array([shorts[s] or [0] for s in shorts]).reshape(-1,1)
+        self._sdv_longs = np.std(std_longs)
+        self._sdv_shorts = np.std(std_shorts )
+        self._sdv_all = np.std(std_longs + std_shorts)
 
         self.cash = cash
         self.datetimeindex = datetimeindex.reset_index(drop=True)
@@ -28,8 +31,6 @@ class Result:
     @property
     def date_range(self):
         # reset index of self.datetimeindex
-       
-
         return self.datetimeindex.iloc[0].strftime("%m/%d/%Y"), self.datetimeindex.iloc[-1].strftime("%m/%d/%Y")
 
     @property
@@ -67,6 +68,8 @@ class Result:
         table =  str(tabulate(self.statistics, headers = 'keys', tablefmt="github", showindex = True, numalign="right"))
         return '\n' + ' -> '.join(self.date_range) + f'\n\nROI:\t{self.roi}\n\n' + table
 
+    def __repr__(self) -> str:
+        pass
 
 
 class ResultsContainer:
@@ -84,7 +87,7 @@ class ResultsContainer:
         return self.results[key]
 
     def __iter__(self):
-        return iter(self.results)
+        return self.results.__iter__()
 
     # TODO: should this be mean ROI or total ROI?
     def save(self, filename):
@@ -93,7 +96,8 @@ class ResultsContainer:
 
     @property
     def roi(self):
-        return np.mean([result.roi for result in self.results])
+        rois = [result.roi for result in self.results]
+        return (np.mean(rois), np.std(rois))
 
     @property
     def statistics(self):
@@ -104,7 +108,7 @@ class ResultsContainer:
 
     def __str__(self):
         table = str(tabulate(self.statistics, headers = 'keys', tablefmt="github", showindex = True, numalign="right"))
-        return '\n' + str(self.parameters) + f'\n\nMean ROI:\t{self.roi}\n\n' + '\n'.join([(' -> '.join(res.date_range) + f':\t{res.roi:.3f}') for res in self]) +'\n\n'  + table
+        return '\n' + str(self.parameters) + f'\n\nMean ROI:\t{self.roi[0]}\nSTD ROI:\t{self.roi[1]}\n\n' + '\n'.join([(' -> '.join(res.date_range) + f':\t{res.roi:.3f}') for res in self]) +'\n\n'  + table
 
 
 class SweepResults:
@@ -116,13 +120,13 @@ class SweepResults:
         for result in container_results:
 
             for para, val in result.parameters['algorithm'].items():
-                a[para] = sorted(a.get(para, []) + [val])
+                a[para] = sorted(a.get(para, []) + [str(val)])
 
-            for indic, params in result.parameters['indicator']:
+            for indic, params in result.parameters['indicator'].items():
                 i[indic] = i.get(indic, dict())
 
-                for para, val in params:
-                    i[indic][para] = sorted(i[indic].get(para, []) + [val])
+                for para, val in params.items():
+                    i[indic][para] = sorted(i[indic].get(para, []) + [str(val)])
 
 
         self.parameters = {
@@ -134,15 +138,16 @@ class SweepResults:
 
     @property
     def best(self):
-        return max(self.container_results, key=lambda res: res.roi)
+        return max(self.container_results, key=lambda res: res.roi[0])
 
+    # TODO: add big dataframe of all results
     
     def __getitem__(self, idx):
 
         return self.container_results[idx]
 
     def __iter__(self):
-        return self.container_results
+        return self.container_results.__iter__()
 
     def save(self, filename):
         with open(filename, 'w') as f:

@@ -58,7 +58,7 @@ class StockData:
         for index in (tqdm(range(len(self)), total=len(self), desc = '> Precompiling data') if self._verbose else range(len(self))):
             A = {stock: dict() for stock in self.sis}
             for stock, indicator, i in self.sinames:
-                A[stock][indicator] = self._data[:index, i]
+                A[stock][indicator] = self._data[:index+1, i]
             siss.append(A)
         return self._prices, siss
 

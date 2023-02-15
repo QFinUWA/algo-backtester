@@ -145,7 +145,7 @@ meeting.md
 res.ipynb
 *\unit.py
 del/
-test,py
+test.py
 
 # private information
 API_key.txt

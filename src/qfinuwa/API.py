@@ -2,15 +2,28 @@ import os
 import pandas as pd
 import urllib.parse as urlparse
 from itertools import product
-from multiprocessing.pool import ThreadPool
-from multiprocessing import cpu_count
+# from multiprocessing.pool import ThreadPool
+# from multiprocessing import cpu_count
 
+from IPython import get_ipython
+
+try:
+    shell = get_ipython().__class__.__name__
+    if shell in ['ZMQInteractiveShell']:
+        from tqdm import tqdm_notebook as tqdm   # Jupyter notebook or qtconsole or Terminal running IPython  
+    else:
+         from tqdm import tqdm   
+except NameError:
+    from tqdm import tqdm      # Probably standard Python interpreter
 
 class API:
 
     def __init__(self, api_key_path='API_key.txt', data_folder=None):
 
         self.data_folder = data_folder
+
+        if not os.path.exists(data_folder):
+            os.mkdir(data_folder)
 
         if not os.path.exists(api_key_path):
             raise ValueError(f'{api_key_path} does not exist.')

@@ -29,12 +29,16 @@ class Indicators:
         return self._default
 
     def set_default(self, indicators, strategy):
-
+        
         defaults = strategy.defaults()['indicators']
+        # print(defaults)
 
-        for indicator, params in defaults.items():
+        # print(indicators)
+        # TDOO: check if indicators are in defaults
+        for indicator, params in indicators.items():
             defaults[indicator].update(indicators[indicator])
 
+        # print(defaults)
         for indicator, params in defaults.items():
             if not self._is_cached(indicator, params): 
                 self.add(indicator, params, strategy)
@@ -102,24 +106,31 @@ class Indicators:
         if not self._default:
             raise ValueError(f'No default parameters found.')
 
+        self._indicators_iterations = {indicator: np.array(list(self._get_indicator(indicator, i_params).values())) for indicator, i_params in self._default.items()}
 
-        self._indicators_iterations = {indicator: np.stack(list(self._get_indicator(indicator, i_params).values()), axis=1) for indicator, i_params in self._default.items()}
+        # print(self._indicators_iterations)
+        # assert False
 
         self._curr_indicators = {stock: {indicator: None for indicator in self._default} for stock in self._stocks}  
 
-        self._indexes = product(range(len(self._stocks)), self._indicators_iterations)
+        self._indexes = list(product(range(len(self._stocks)), self._indicators_iterations))
         self._i = 0
 
         return self
 
     def __next__(self):
 
+        # print(self._i, len(self))
         if self._i >= len(self):
-            raise ValueError(f'Index {self._i } out of range.')
+            raise StopIteration(f'Index {self._i } out of range.')
 
-        for s, indicator in self._indexes:  
-            self._curr_indicators[self._stocks[s]][indicator] = self._indicators_iterations[indicator][:self._i, s]
-        
+        for s, indicator in self._indexes: 
+            self._curr_indicators[self._stocks[s]][indicator] = self._indicators_iterations[indicator][s, :self._i]
+            # if indicator == 'vol_difference' and self._i == 5:
+            #     print(self._indicators_iterations['vol_difference'])
+            #     print('--------------------------')
+            #     print(self._indicators_iterations['vol_difference'][s, :self._i+1])
+            #     assert False
         self._i += 1
         
         return self._curr_indicators
