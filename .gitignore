@@ -146,6 +146,9 @@ res.ipynb
 *\unit.py
 del/
 test.py
+DEL.py
+collab.ipynb
+example.py
 
 # private information
 API_key.txt

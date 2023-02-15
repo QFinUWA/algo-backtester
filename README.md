@@ -2,29 +2,91 @@
 
 ## Setup
 
-To set up, run the following command at the root of the codebase:
+To install on your system, use pip:
 
-``python setup.py build_ext --inplace``
+```
+pip install qfinuwa
+```
 
-This will compile the cython shared objects that provide functionality. 
+## API
 
-Currently, I am working on automatiting this via conda forge or PyPI. 
 
-The final goal is to simply run either:
+## Algorithm
 
-- conda install qfin
-- pip install qfin
+You algorithm can be initialised as follows:
 
-## Running 
+```py
 
-An example script is provided (``frontend_plan.py``) which is currently being used to model the design of the framework.
+class MyCustomStrategy(Algorithm):
+  
+    def __init__(self):
+        return
+        
+    def on_data(self, data, indicators, portfolio):
+        return
 
-The design of the framework is to provide a base ``Algorithm`` class that contains 
+```
 
-- the functions used to add indicators
-- the logic function for trading
-- any variables required for the above
+Any hyperparameters you want to add to your model you can do in ``__init__``.
 
-The implemented algoirthm (instanciated via ``class MyAlgorithm(qfin.Algorithm)``), will take a Portfolio object that contains the cash, holdings and history of trades and use incoming and past information (in the form of a dictionary of arrays of data).
 
-The ``Backtester`` class will handle all of this and return results. 
+### on_data
+
+``on_data`` takes in data and indicators which are both type ``dict``, keyed by the stocks. The portfolio class manages buying and selling stocks. 
+
+### Indicators
+
+To add an indicator to be passed into ``on_data`` during evalutation, define a new function in your strategy class that takes in data and returns a data column of the same length.
+
+```py
+# super bad example I need to change this
+class MyCustomStrategy(Algorithm):
+  
+    def __init__(self):
+        return
+        
+    def on_data(self, data, indicators, portfolio):
+        return
+
+    @Algorithm.indicator
+    def vol_difference(data):
+        return data['volume'].diff() + addition
+```
+
+In the above example we added an indicator called ``"vol_difference"`` that can be accessed during execution by 
+
+```py
+        
+    def on_data(self, data, indicators, portfolio):
+
+        V = indicators["vol_difference"]
+
+        return
+```
+
+We can also add parameters to the indicator and algorithm itself, but we'll see that later.
+
+## Backtester 
+
+The ``Backtester`` class runs backtests given the inputs:
+- An algorithm to test
+- Data to test it on
+- Hyperparameters for the algorithm including
+  - Algorithm Hyperparameters
+  - Indicator Hyperparameters
+- Starting Balance and Fee
+- Evaluation time
+
+A backtester can be initialised like so:
+
+```py
+backtester = Backtester(['AAPL', 'GOOG'])
+```
+
+You can pass in your algorithm when initialising, or later.
+
+```py
+backtester = Backtester(['AAPL', 'GOOG'], strategy=MyCustomStrategy)
+```
+
+TODO finish this section.

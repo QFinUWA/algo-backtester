@@ -6,7 +6,8 @@ from functools import wraps
 class Algorithm:
 
     def __init__(self):
-        self.indicator_parameters = dict()
+        # self.indicator_parameters = dict()
+        return
 
     @classmethod
     def indicator(cls, func, *args, **kwargs):
@@ -39,9 +40,9 @@ class Algorithm:
             ret['indicators'][name] = get_defaults(function)
         return ret
 
-    def set_indicator_params(self, params):
-        # TODO raise error if not dict
-        self.indicator_parameters.update(params)
+    # def set_indicator_params(self, params):
+    #     # TODO raise error if not dict
+    #     self.indicator_parameters.update(params)
 
     
 #    def add_indicator(self, name, func):

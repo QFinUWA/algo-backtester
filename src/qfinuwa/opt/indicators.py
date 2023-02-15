@@ -18,9 +18,6 @@ class Indicators:
         self._default = None
 
         self._indicators_iterations = None
-
-
-
     # TODO
     
     
@@ -65,7 +62,6 @@ class Indicators:
 
     #
     def _is_cached(self, indicator, params):
-
         if indicator not in self._cache:
             return False
 

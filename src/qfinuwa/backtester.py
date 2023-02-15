@@ -195,14 +195,14 @@ class Backtester:
             if not isinstance(algorithm_params, dict):
                 raise TypeError(f'algorithm_params must be of type dict, not {type(algorithm_params)}')
         else:
-            if not self._algorithm_params:
+            if not self._algorithm_params and self._strategy.defaults()['algorithm']:
                 raise ValueError('No default algorithm parameters specified')
             algorithm_params = self.algorithm_params
-
 
         if bool(indicator_params):
             if not isinstance(algorithm_params, dict):
                 raise TypeError(f'indicator_params must be of type dict, not {type(indicator_params)}')
+            print(indicator_params)
             self._indicator_cache.set_default(indicator_params, self._strategy)
         else:
             if not self._indicator_cache.defaults:
@@ -221,7 +221,10 @@ class Backtester:
         desc = f'> Running backtest over {cv} sample{"s" if cv > 1 else ""} of {self._days} day{"s" if cv > 1 else ""}'
         for start, end in (tqdm(random_periods, desc = desc) if progressbar and cv > 1 else random_periods):
             portfolio = Portfolio(self._stocks, self._starting_cash, self._fee)
-            algorithm = self._strategy(*tuple(), **algorithm_params or None)
+            if algorithm_params:
+                algorithm = self._strategy(*tuple(), **algorithm_params)
+            else:
+                algorithm = self._strategy(*tuple())
             
             test = data[start:end]
             #---------[RUN THE ALGORITHM]---------#
