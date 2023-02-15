@@ -75,7 +75,6 @@ class Backtester:
         self._indicator_cache.update_algorithm(algorithm)
 
 
-
     def __str__(self):
         return str(self._indicator_cache)
 
@@ -231,7 +230,7 @@ class Backtester:
             for params in (tqdm(test, desc=desc) if progressbar and cv == 1 else test):
                 algorithm.run_on_data(params, portfolio)
             cash, longs, shorts = portfolio.wrap_up()
-            results.append(Result(self._stocks, cash, longs, shorts, self._data.index[start:end]))
+            results.append(Result(self._stocks, self._data, self._data.index, (start, end), cash, longs, shorts ))
             #-------------------------------------#
 
         return ResultsContainer((algorithm_params, indicator_params), results)

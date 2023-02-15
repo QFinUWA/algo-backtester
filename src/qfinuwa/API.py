@@ -2,8 +2,8 @@ import os
 import pandas as pd
 import urllib.parse as urlparse
 from itertools import product
-# from multiprocessing.pool import ThreadPool
-# from multiprocessing import cpu_count
+from multiprocessing.pool import ThreadPool
+from multiprocessing import cpu_count
 
 from IPython import get_ipython
 

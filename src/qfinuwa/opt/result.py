@@ -2,27 +2,35 @@ import itertools
 import pandas as pd
 import numpy as np
 from tabulate import tabulate
-
+import bokeh.plotting
 
 class Result:
 
-    def __init__(self, stocks, cash, longs, shorts, datetimeindex):
-        
-        longs = {stock: [p for _,s,p in longs if s == stock] for stock in stocks}
-        shorts = {stock: [p for _,s,p in shorts if s == stock] for stock in stocks}
+    def __init__(self, stocks, stockdata, datetimeindex, startend, cash, llongs, sshorts):
+        self._start, self._end = startend
+
+        datetimeindex = datetimeindex[self._start: self._end]
+
+        self._longs = llongs
+        self._shorts = sshorts 
+
+        longs = {stock: [p for _,s,p in llongs['sell'] if s == stock] for stock in stocks}
+        shorts = {stock: [p for _,s,p in sshorts['close'] if s == stock] for stock in stocks}
         self.longs = {k: (len(v), np.mean(v or [0]), np.std(v or [0])) for k,v in longs.items()}
         self.shorts = {k: (len(v), np.mean(v or [0]), np.std(v or [0])) for k,v in shorts.items()}
         self._sdv = {stock: np.std(longs[stock] + shorts[stock] or [0]) for stock in stocks}
 
-        std_longs= np.array([longs[s] or [0] for s in longs]).reshape(-1,1)
-        std_shorts = np.array([shorts[s] or [0] for s in shorts]).reshape(-1,1)
+        std_longs= np.array([longs[s] or [0] for s in longs]).flatten()
+        std_shorts = np.array([shorts[s] or [0] for s in shorts]).flatten()
         self._sdv_longs = np.std(std_longs)
         self._sdv_shorts = np.std(std_shorts )
-        self._sdv_all = np.std(std_longs + std_shorts)
+        self._sdv_all = np.std(np.concatenate([std_longs, std_shorts]))
 
         self.cash = cash
-        self.datetimeindex = datetimeindex.reset_index(drop=True)
-        self.stocks = stocks
+        self._datetimeindex = datetimeindex.reset_index(drop=True)
+        self._stocks = stocks
+
+        self._stockdata = stockdata
 
     @property
     def roi(self):
@@ -31,7 +39,7 @@ class Result:
     @property
     def date_range(self):
         # reset index of self.datetimeindex
-        return self.datetimeindex.iloc[0].strftime("%m/%d/%Y"), self.datetimeindex.iloc[-1].strftime("%m/%d/%Y")
+        return self._datetimeindex.iloc[0].strftime("%m/%d/%Y"), self._datetimeindex.iloc[-1].strftime("%m/%d/%Y")
 
     @property
     def statistics(self):
@@ -45,7 +53,7 @@ class Result:
                 self.shorts[stock][2],
                 self.longs[stock][0],
                 self.longs[stock][1],
-                self.shorts[stock][2]] for stock in self.stocks}, index = [f'{b}_{a}' for a,b in itertools.product(['trades', 'longs', 'shorts'], ["n", 'mean_per', 'std'])])
+                self.shorts[stock][2]] for stock in self._stocks}, index = [f'{b}_{a}' for a,b in itertools.product(['trades', 'longs', 'shorts'], ["n", 'mean_per', 'std'])])
         
         df['Net'] = [ df.iloc[0, :].sum(),
                         df.iloc[1, :].mean(),
@@ -58,6 +66,37 @@ class Result:
                         self._sdv_shorts]
 
         return df
+
+    def plot(self, stocks = None, filename = None):
+        p = bokeh.plotting.figure(x_axis_type="datetime", title="Portfolio Value over Time", width=1000, height=400)
+        p.grid.grid_line_alpha = 0.3
+        p.xaxis.axis_label = 'Date'
+        p.yaxis.axis_label = 'Portfolio Value'
+        
+        # -----[plotting portfolio]-----
+        p.line(self._datetimeindex, self.cash, line_width=2)
+
+        # -----[plotting buys and sells]-----
+        for long in self._longs['buy']:
+            p.circle(self._datetimeindex[long[0]], self.cash[long[0]], color='red', size=8)
+        for long in self._longs['sell']:
+            p.circle(self._datetimeindex[long[0]], self.cash[long[0]], color='green', size=8)
+
+        for short in self._shorts['enter']:
+            p.circle(self._datetimeindex[short[0]], self.cash[short[0]], color='blue', size=8)
+        for short in self._shorts['close']:
+            p.circle(self._datetimeindex[short[0]], self.cash[short[0]], color='orange', size=8)
+
+        for stock in stocks or []:
+            if stock not in self._stocks:
+                raise ValueError(f'{stock} not in portfolio')
+
+
+            p.line(self._datetimeindex, self._stockdata._stock_df[stock]['close'][self._start:self._end], line_width=2, color='red', legend_label=stock)
+
+        bokeh.plotting.show(p)
+        if filename:
+            bokeh.plotting.output_file(filename)
     
     def save(self, filename):
         with open(filename, 'w') as f:

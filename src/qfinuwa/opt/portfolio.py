@@ -25,8 +25,8 @@ class Portfolio:
 
         self._cash_history = []
 
-        self.long_stats = []
-        self.short_stats = []       
+        self.long_stats = {'buy': [], 'sell': []}
+        self.short_stats = {'enter': [], 'close': []}       
 
 
     @property
@@ -103,6 +103,7 @@ class Portfolio:
         self._n_longs[stock] += quantity
 
         heapq.heappush(self._longs[stock], (cost, quantity))
+        self.long_stats['buy'].append((self._i, stock, quantity))
 
         return 1
 
@@ -162,7 +163,7 @@ class Portfolio:
         ## -----
         
         self._cash += total_pay
-        self.long_stats.append((self._i, stock, total_pay - total_cost))
+        self.long_stats['sell'].append((self._i, stock, total_pay - total_cost))
         
         return 1
 
@@ -190,7 +191,7 @@ class Portfolio:
 
         self._n_shorts[stock] += quantity
         heapq.heappush(self._shorts[stock], (-price, quantity))
-
+        self.short_stats['enter'].append((self._i, stock, quantity))
         return 1
 
     def cover_short(self, stock: str, quantity: float=None, cost: float=None) -> int:
@@ -245,5 +246,5 @@ class Portfolio:
         profit = deposit - self._fee_mult*cost_to_buy 
         self._cash += profit + deposit
 
-        self.short_stats.append((self._i, stock, profit))
+        self.short_stats['close'].append((self._i, stock, profit))
         return 1
