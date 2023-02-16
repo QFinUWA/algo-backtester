@@ -20,8 +20,8 @@ class Result:
         self.shorts = {k: (len(v), np.mean(v or [0]), np.std(v or [0])) for k,v in shorts.items()}
         self._sdv = {stock: np.std(longs[stock] + shorts[stock] or [0]) for stock in stocks}
 
-        std_longs= np.array([longs[s] or [0] for s in longs]).flatten()
-        std_shorts = np.array([shorts[s] or [0] for s in shorts]).flatten()
+        std_longs = list(itertools.chain.from_iterable([longs[s] or [0] for s in longs]))
+        std_shorts = list(itertools.chain.from_iterable([shorts[s] or [0] for s in shorts]))
         self._sdv_longs = np.std(std_longs)
         self._sdv_shorts = np.std(std_shorts )
         self._sdv_all = np.std(np.concatenate([std_longs, std_shorts]))

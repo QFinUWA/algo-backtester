@@ -10,7 +10,7 @@ class Algorithm:
         return
 
     @classmethod
-    def indicator(cls, func, *args, **kwargs):
+    def Indicator(cls, func, *args, **kwargs):
         @wraps(func)
         def wrapper_func(*_args, **_kwargs):
             return func(*_args, **_kwargs)

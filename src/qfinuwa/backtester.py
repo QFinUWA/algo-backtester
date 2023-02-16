@@ -60,7 +60,7 @@ class Backtester:
 
     @property
     def indicator_params(self):
-        return self._indicator_cache.defaults
+        return self._indicator_cache.curr_indicators
             
     @property
     def fee(self):
@@ -94,29 +94,29 @@ class Backtester:
 
     @property
     def indicator_params(self):
-        return self._indicator_cache.defaults
+        return self._indicator_cache.curr_indicators
         
     def set_indicator_params(self, params):
         
-        self._indicator_cache.set_default(params, self._strategy)
+        self._indicator_cache.set_indicator(params, self._strategy)
 
 
-    def backtest_strategies(self, strategy_params, indicator_params, cv = 1, seed=None):
+    def run_grid_search(self, strategy_params, indicator_params, cv = 1, seed=None):
         # get all combinations of algorithm paramters
         
-        if strategy_params.keys() - self._strategy.defaults()['algorithm'].keys():
+        if strategy_params.keys() - self.algorithm_params.keys():
             raise ValueError('Invalid algorithm parameters')
         
         strategy_params = {**self.algorithm_params, **strategy_params}
 
-        if indicator_params.keys() - self._indicator_cache.defaults.keys():
+        if indicator_params.keys() - self._indicator_cache.curr_indicators.keys():
             raise ValueError('Invalid indicator name')
 
         # indicator_params = {**self.indicator_params, **indicator_params}
         for indicator, paramters in indicator_params.items():
-            if paramters.keys() - self._indicator_cache.defaults[indicator].keys():
+            if paramters.keys() - self._indicator_cache.curr_indicators[indicator].keys():
                 raise ValueError('Invalid indicator parameters')
-            indicator_params[indicator] = {**self._indicator_cache.defaults[indicator], **paramters}
+            indicator_params[indicator] = {**self._indicator_cache.curr_indicators[indicator], **paramters}
 
         print('> Backtesting the across the following ranges:')
         print('Agorithm Parameters', strategy_params)
@@ -129,7 +129,7 @@ class Backtester:
         strategy_comb = [dict(zip(param, v)) for v in itertools.product(*val)]
 
         # # precompute all indicators and store in dictionary
-        len_indicator_comb = math.prod(len(values if isinstance(values, list) else [values]) for paramters in indicator_params.values() for values in paramters.values())     
+        len_indicator_comb = sum(math.prod([len(values if isinstance(values, list) else [values]) for values in paramters.values()]) for paramters in indicator_params.values() )     
         indicator_comb = collections.defaultdict(list)
 
         with tqdm(total=len_indicator_comb, desc="Precomputing indicator variants.") as bar:
@@ -150,8 +150,6 @@ class Backtester:
 
         # get every combination of different indicators
         trials = [dict(zip(indicator_comb.keys(), c)) for c in itertools.product(*indicator_comb.values())]
-        s = time()
-
         # 
         # run
         seed = seed or self.random.randint(0, 2**32)
@@ -162,27 +160,6 @@ class Backtester:
         
         return SweepResults(res)
         
-        if not multiprocessing:
-            res = []
-            print('Running backtests...')
-            for alg_params, ind_params in itertools.product(strategy_comb, trials):
-                print(alg_params, ind_params)
-                res.append(self.run(algorithm_params=alg_params, indicator_params=ind_params, progressbar=False))
-        else:
-            CustomManager.register('StockData', StockData)
-            CustomManager.register('dict', dict)
-            with CustomManager() as manager:
-                stockdata = manager.StockData(self._stocks, self._x)
-                portfolios = [Portfolio(self._stocks, self._starting_cash, self._fee, self._data.len()) for _ in range(len(strategy_comb) * len(trials))]
-                alg = self._strategy
-                indicator_cache = manager.dict(self._indicator_cache)
-                print('Running backtests...')
-                with Pool(processes=4) as p:
-                    res = p.map(run_wrapper, [(portfolios, alg, indicator_cache, strat, ind, stockdata) for (strat, ind), portfolios in zip(itertools.product(strategy_comb, trials), portfolios)])
-# portfolio, algorithm, indicators, algorithm_params, indicator_params, data_iterator
-        print(time() - s)
-        print(res)
-        return res
 
     '''
     Backtests the stored strategy. 
@@ -190,27 +167,31 @@ class Backtester:
 
     def run(self, algorithm_params = None, indicator_params = None, progressbar=True, cv=1, seed=None):
 
+        if not self._strategy:
+            raise ValueError('No algorithm specified')
+
         if bool(algorithm_params):
             if not isinstance(algorithm_params, dict):
                 raise TypeError(f'algorithm_params must be of type dict, not {type(algorithm_params)}')
+
+            # fill in missing parameters with defaults
+            alg_defaults = self._strategy.defaults()['algorithm']
+            alg_defaults.update(algorithm_params)
+            algorithm_params = alg_defaults
         else:
-            if not self._algorithm_params and self._strategy.defaults()['algorithm']:
-                raise ValueError('No default algorithm parameters specified')
             algorithm_params = self.algorithm_params
 
         if bool(indicator_params):
             if not isinstance(algorithm_params, dict):
                 raise TypeError(f'indicator_params must be of type dict, not {type(indicator_params)}')
-            print(indicator_params)
-            self._indicator_cache.set_default(indicator_params, self._strategy)
+            for indicator, param in indicator_params.items():
+                self._indicator_cache.add(indicator, param, self._strategy)
         else:
-            if not self._indicator_cache.defaults:
-                raise ValueError('No default indicator parameters specified')
-            indicator_params = self._indicator_cache.defaults
+            indicator_params = self._indicator_cache.curr_indicators
 
 
         # caclulate indicators 
-        data = list(zip(*self._precomp_prices, self._indicator_cache))
+        data = list(zip(*self._precomp_prices, self._indicator_cache.iterate_indicators(indicator_params)))
 
         self.random.seed(seed or random.randint(0, 2**32))
         random_periods = self.get_random_periods(cv) 
