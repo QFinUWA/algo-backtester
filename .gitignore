@@ -150,6 +150,10 @@ DEL.py
 collab.ipynb
 example.py
 colab.ipynb
+*.html
+*.ipynb
+plan.md
+invert_dict.py
 
 # private information
 API_key.txt

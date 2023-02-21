@@ -9,19 +9,19 @@ class Algorithm:
         # self.indicator_parameters = dict()
         return
 
-    @classmethod
-    def Indicator(cls, func, *args, **kwargs):
-        @wraps(func)
-        def wrapper_func(*_args, **_kwargs):
-            return func(*_args, **_kwargs)
-        wrapper_func.indicator = True
-        return wrapper_func
+    # @classmethod
+    # def Indicator(cls, func, *args, **kwargs):
+    #     @wraps(func)
+    #     def wrapper_func(*_args, **_kwargs):
+    #         return func(*_args, **_kwargs)
+    #     wrapper_func.indicator = True
+    #     return wrapper_func
 
-    @classmethod
-    def indicator_functions(cls):
-        # TODO: filter by only functions
-        return {k: v for k, v in inspect.getmembers(cls)
-                if callable(v) and hasattr(getattr(cls, k), 'indicator') and not k.startswith('__')}
+    # @classmethod
+    # def indicator_functions(cls):
+    #     # TODO: filter by only functions
+    #     return {k: v for k, v in inspect.getmembers(cls)
+    #             if callable(v) and hasattr(getattr(cls, k), 'indicator') and not k.startswith('__')}
 
     @classmethod
     def defaults(cls):
@@ -34,11 +34,10 @@ class Algorithm:
                 if v.default is not inspect.Parameter.empty
             }
 
-        ret = {'algorithm': get_defaults(cls.__init__)}
-        ret['indicators'] = dict()
-        for name, function in cls.indicator_functions().items():
-            ret['indicators'][name] = get_defaults(function)
-        return ret
+        # ret['indicators'] = dict()
+        # for name, function in cls.indicator_functions().items():
+        #     ret['indicators'][name] = get_defaults(function)
+        return get_defaults(cls.__init__)
 
     # def set_indicator_params(self, params):
     #     # TODO raise error if not dict

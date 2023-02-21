@@ -1,7 +1,7 @@
 from .algorithm import Algorithm
 from .API import API    
 from .backtester import Backtester
-
+from .indicators import Indicators
 
 
 class Algorithm(Algorithm):
@@ -13,3 +13,5 @@ class API(API):
 class Backtester(Backtester):
     pass
 
+class Indicators(Indicators):
+    pass

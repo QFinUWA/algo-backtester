@@ -5,12 +5,15 @@ from .opt.stockdata import StockData
 import pandas as pd
 from time import time
 import collections
-from .opt.indicators import Indicators
 import numpy as np
 import random
 from tabulate import tabulate
 from .opt.result import Result, ResultsContainer, SweepResults
 import math
+from .algorithm import Algorithm
+from .indicators import Indicators
+
+from itertools import islice
 
 from IPython import get_ipython
 
@@ -27,40 +30,41 @@ except NameError:
 
 class Backtester:
 
-    def __init__(self, stocks, data=r'\data', strategy=None, days='all', cash=1000, fee=0.001, seed=None):
+    def __init__(self, stocks, strategy, pindicators, data=r'\data', days='all', cash=1000, fee=0.001, seed=None):
+
+        # raise execption if strategy is not a subclass of Strategy
+        if not issubclass(strategy, Algorithm):
+            raise ValueError('Strategy must be a subclass of Algorithm')   
+        self._strategy = strategy
 
         self._data = StockData(stocks, data, verbose=True)
-
         self._precomp_prices = self._data.prices
 
-        self._stocks = stocks
+        # raise expection if indiators is not a subclass of Indicators
+        if not issubclass(pindicators, Indicators):
+            raise ValueError('Indicators must be a subclass of Indicators')
+        
+        self._indicators = pindicators(self._data)
 
         self._fee = fee
         self._starting_cash = cash
         
         self._algorithm_params = dict()
 
-        self._indicator_cache = Indicators(stocks, self._data._stock_df)
-
         self._days = days
 
-        self._strategy = None
-        if strategy is not None:
-            self.update_algorithm(strategy)
-
-        self.seed = seed
-
-        self.random = random
+        self._random = random
 
     def update_days(self, days):
         self._days = days
 
-    def update_seed(self, seed):
-        self.seed = seed
 
+    def add_indicator(self, name, func):
+        pass
+        
     @property
     def indicator_params(self):
-        return self._indicator_cache.curr_indicators
+        return self._indicators.params
             
     @property
     def fee(self):
@@ -70,18 +74,9 @@ class Backtester:
     def stocks(self):
         return self._data.stocks
 
-    def update_algorithm(self, algorithm):
-        self._strategy = algorithm
-        self._indicator_cache.update_algorithm(algorithm)
-
-
-    def __str__(self):
-        return str(self._indicator_cache)
-
-    
     @property
     def algorithm_params(self):
-        x = self._strategy.defaults()['algorithm']
+        x = self._strategy.defaults()
         x.update(self._algorithm_params)  
         return x
 
@@ -89,83 +84,75 @@ class Backtester:
 
         if not self._strategy:
             raise ValueError('No algorithm specified')
-        
-        self._algorithm_params.update({k:v for k,v in params.items() if k in self._strategy.defaults()['algorithm']})
+        self._algorithm_params.update({k:v for k,v in params.items() if k in self._strategy.defaults()})
 
-    @property
-    def indicator_params(self):
-        return self._indicator_cache.curr_indicators
-        
+    def update_algorithm(self, algorithm):
+        self._strategy = algorithm
+
+        if algorithm.defaults().keys() - self.algorithm_params.keys():
+            print('! Algorithm parameters changed: resetting to defaults !')
+            self.algorithm_params = algorithm.defaults()
+
+
+    def update_indicators(self, pindicators):
+        self._indicators = pindicators(self._data)
+
+    def __str__(self):
+        return  f'Backtester:\n' + \
+                f'- Strategy: {self._strategy.__name__}\n' + \
+                f'\t- Params: {self.algorithm_params}\n' + \
+                f'- Indicators: {self._indicators.__class__.__name__}\n' + \
+                f'\t- Params: {self.indicator_params}\n' + \
+                f'\t- Indicators: {self._indicators.indicator_groups}\n' + \
+                f'- Stocks: {self.stocks}\n' + \
+                f'- Fee {self.fee}\n' + \
+                f'- Days: {self._days}\n'
+    
+    def __repr__(self):
+        return self.__str__()
+
     def set_indicator_params(self, params):
-        
-        self._indicator_cache.set_indicator(params, self._strategy)
+        self._indicators.update_parameters(params)
 
 
-    def run_grid_search(self, strategy_params, indicator_params, cv = 1, seed=None):
+    def run_grid_search(self, strategy_params = None, indicator_params = None, cv = 1, seed=None):
         # get all combinations of algorithm paramters
-        
+        # ----[strategy params]----
+        strategy_params = strategy_params or dict()
+
         if strategy_params.keys() - self.algorithm_params.keys():
             raise ValueError('Invalid algorithm parameters')
+
+        default_strategy_params = {**self.algorithm_params, **strategy_params}
+        param, val = zip(*default_strategy_params.items())
+        val = map(lambda v: v if isinstance(v, list) else [v], val)
+        strategy_params_list = [dict(zip(param, v)) for v in itertools.product(*val)]
+
+        # ----[indicator params]----
         
-        strategy_params = {**self.algorithm_params, **strategy_params}
+        indicator_params = indicator_params or dict()
+        indicator_params_list = self._indicators.get_permutations(indicator_params)
 
-        if indicator_params.keys() - self._indicator_cache.curr_indicators.keys():
-            raise ValueError('Invalid indicator name')
-
-        # indicator_params = {**self.indicator_params, **indicator_params}
-        for indicator, paramters in indicator_params.items():
-            if paramters.keys() - self._indicator_cache.curr_indicators[indicator].keys():
-                raise ValueError('Invalid indicator parameters')
-            indicator_params[indicator] = {**self._indicator_cache.curr_indicators[indicator], **paramters}
 
         print('> Backtesting the across the following ranges:')
-        print('Agorithm Parameters', strategy_params)
-        print('Indicator Parameters', indicator_params)
+        print('Agorithm Parameters', default_strategy_params)
+        print('Indicator Parameters', self._indicators._fill_in_defaults(indicator_params))
 
-        param, val = zip(*strategy_params.items())
-
-        val = map(lambda v: v if isinstance(v, list) else [v], val)
-
-        strategy_comb = [dict(zip(param, v)) for v in itertools.product(*val)]
-
-        # # precompute all indicators and store in dictionary
-        len_indicator_comb = sum(math.prod([len(values if isinstance(values, list) else [values]) for values in paramters.values()]) for paramters in indicator_params.values() )     
-        indicator_comb = collections.defaultdict(list)
-
-        with tqdm(total=len_indicator_comb, desc="Precomputing indicator variants.") as bar:
-            for indicator, paramters in indicator_params.items():
-                
-                param, val = zip(*paramters.items())
-
-                val = map(lambda v: v if isinstance(v, list) else [v], val)
-
-                permutations_dicts = [dict(zip(param, v))
-                                for v in itertools.product(*val)]
-
-                for perm in permutations_dicts:
-
-                    self._indicator_cache.add(indicator, perm, self._strategy)
-                    indicator_comb[indicator].append(perm)
-                    bar.update(1)
-
-        # get every combination of different indicators
-        trials = [dict(zip(indicator_comb.keys(), c)) for c in itertools.product(*indicator_comb.values())]
-        # 
         # run
-        seed = seed or self.random.randint(0, 2**32)
+        seed = seed or self._random.randint(0, 2**32)
         res = []
         print('Running backtests...')
-        for alg_params, ind_params in tqdm(itertools.product(strategy_comb, trials), total=len(strategy_comb) * len(trials), desc=f"Running paramter sweep (cv={cv})"):
+        for alg_params, ind_params in tqdm(itertools.product(strategy_params_list, indicator_params_list), total=len(strategy_params_list) * len(indicator_params_list), desc=f"Running paramter sweep (cv={cv})"):
             res.append(self.run(algorithm_params=alg_params, indicator_params=ind_params, cv=cv, seed=seed, progressbar=False))
         
         return SweepResults(res)
-        
+        # TODO: add something to deal with reading nan values in portfolio
 
     '''
     Backtests the stored strategy. 
     '''
 
-    def run(self, algorithm_params = None, indicator_params = None, progressbar=True, cv=1, seed=None):
+    def run(self, algorithm_params = None, indicator_params = None, progressbar=True, cv=1, seed=None, precomp_indicators=None):
 
         if not self._strategy:
             raise ValueError('No algorithm specified')
@@ -175,43 +162,55 @@ class Backtester:
                 raise TypeError(f'algorithm_params must be of type dict, not {type(algorithm_params)}')
 
             # fill in missing parameters with defaults
-            alg_defaults = self._strategy.defaults()['algorithm']
+            alg_defaults = self._strategy.defaults()
             alg_defaults.update(algorithm_params)
             algorithm_params = alg_defaults
         else:
             algorithm_params = self.algorithm_params
 
         if bool(indicator_params):
-            if not isinstance(algorithm_params, dict):
+            if not isinstance(indicator_params, dict):
                 raise TypeError(f'indicator_params must be of type dict, not {type(indicator_params)}')
-            for indicator, param in indicator_params.items():
-                self._indicator_cache.add(indicator, param, self._strategy)
+            self._indicators.add_parameters(indicator_params)
         else:
-            indicator_params = self._indicator_cache.curr_indicators
+            indicator_params = self._indicators.params
 
+        self._random.seed(seed or random.randint(0, 2**32))
+        random_periods = self.get_random_periods(cv) 
+        results = []
 
         # caclulate indicators 
-        data = list(zip(*self._precomp_prices, self._indicator_cache.iterate_indicators(indicator_params)))
+        data = zip(*self._precomp_prices, self._indicators.iterate_params(indicator_params))
 
-        self.random.seed(seed or random.randint(0, 2**32))
-        random_periods = self.get_random_periods(cv) 
+        # precomp_indicators = 4.e-7 * np.mean([r[1] - r[0] for r in random_periods]) * cv
 
-        results = []
+        if precomp_indicators:
+            data = list(data)
+
+        # print(list((zip(*self._precomp_prices)))[0])
+
 
         desc = f'> Running backtest over {cv} sample{"s" if cv > 1 else ""} of {self._days} day{"s" if cv > 1 else ""}'
         for start, end in (tqdm(random_periods, desc = desc) if progressbar and cv > 1 else random_periods):
-            portfolio = Portfolio(self._stocks, self._starting_cash, self._fee)
+            portfolio = Portfolio(self.stocks, self._starting_cash, self._fee)
             if algorithm_params:
                 algorithm = self._strategy(*tuple(), **algorithm_params)
             else:
                 algorithm = self._strategy(*tuple())
             
-            test = data[start:end]
+            if precomp_indicators:
+                test = data[start:end]
+            else:
+                test = islice(data, start, end) 
+
+            # TODO: test speed
+            # TODO: test speed of .get
+
             #---------[RUN THE ALGORITHM]---------#
-            for params in (tqdm(test, desc=desc) if progressbar and cv == 1 else test):
+            for params in (tqdm(test, desc=desc, total = end-start, mininterval=0.5) if progressbar and cv == 1 else test):
                 algorithm.run_on_data(params, portfolio)
             cash, longs, shorts = portfolio.wrap_up()
-            results.append(Result(self._stocks, self._data, self._data.index, (start, end), cash, longs, shorts ))
+            results.append(Result(self.stocks, self._data, self._data.index, (start, end), cash, longs, shorts ))
             #-------------------------------------#
 
         return ResultsContainer((algorithm_params, indicator_params), results)
@@ -222,8 +221,8 @@ class Backtester:
             return [(0, len(self._data)) for _ in range(n)]
 
         days = self._data.index.dt.to_period('D').drop_duplicates()
-
-        s_is = self.random.sample(range(len(days) - self._days), n)
+    
+        s_is = self._random.sample(range(len(days) - self._days), n)
 
         starts = (str(days.iloc[s_i]) for s_i in s_is)
         ends = (str(days.iloc[s_i+self._days]) for s_i in s_is)

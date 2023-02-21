@@ -28,8 +28,6 @@ class StockData:
 
         self._verbose = verbose
 
-        if not verbose:
-            print('> Fetching data')
         for stock in (tqdm(stocks, desc='> Fetching data') if verbose else stocks):
 
             _df = pd.read_csv(os.path.join(data, f'{stock}.csv'))
@@ -50,12 +48,16 @@ class StockData:
         self.sinames = [(stock, indicator, i) for i, (stock, indicator) in enumerate(
                         product(self.sis, self._indicators))]
 
+        self._stocks = stocks
+
+    @property
+    def stocks(self):
+        return self._stocks
+
     @property
     def prices(self):
         siss = []
-        if not self._verbose:
-            print('> Precompiling data')
-        for index in (tqdm(range(len(self)), total=len(self), desc = '> Precompiling data') if self._verbose else range(len(self))):
+        for index in (tqdm(range(len(self)), total=len(self), desc = '> Precompiling data', mininterval=0.5) if self._verbose else range(len(self))):
             A = {stock: dict() for stock in self.sis}
             for stock, indicator, i in self.sinames:
                 A[stock][indicator] = self._data[:index+1, i]

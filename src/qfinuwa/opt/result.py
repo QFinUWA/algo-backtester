@@ -77,15 +77,15 @@ class Result:
         p.line(self._datetimeindex, self.cash, line_width=2)
 
         # -----[plotting buys and sells]-----
-        for long in self._longs['buy']:
-            p.circle(self._datetimeindex[long[0]], self.cash[long[0]], color='red', size=8)
-        for long in self._longs['sell']:
-            p.circle(self._datetimeindex[long[0]], self.cash[long[0]], color='green', size=8)
+        lbuy = [i for i, *_ in self._longs['buy']]
+        lsell = [i for i, *_ in self._longs['sell']]
+        sbuy = [i for i, *_ in self._shorts['enter']]
+        sclose = [i for i, *_ in self._shorts['close']]
 
-        for short in self._shorts['enter']:
-            p.circle(self._datetimeindex[short[0]], self.cash[short[0]], color='blue', size=8)
-        for short in self._shorts['close']:
-            p.circle(self._datetimeindex[short[0]], self.cash[short[0]], color='orange', size=8)
+        p.circle([self._datetimeindex[i] for i in lbuy], [self.cash[i] for i in lbuy], color='red', size=8)
+        p.circle([self._datetimeindex[i] for i in lsell], [self.cash[i] for i in lsell], color='green', size=8)
+        p.circle([self._datetimeindex[i] for i in sbuy], [self.cash[i] for i in sbuy], color='blue', size=8)
+        p.circle([self._datetimeindex[i] for i in sclose], [self.cash[i] for i in sclose], color='orange', size=8)
 
         for stock in stocks or []:
             if stock not in self._stocks:
@@ -108,7 +108,7 @@ class Result:
         return '\n' + ' -> '.join(self.date_range) + f'\n\nROI:\t{self.roi}\n\n' + table
 
     def __repr__(self) -> str:
-        pass
+        return self.__str__()
 
 
 class ResultsContainer:
@@ -149,6 +149,8 @@ class ResultsContainer:
         table = str(tabulate(self.statistics, headers = 'keys', tablefmt="github", showindex = True, numalign="right"))
         return '\n' + str(self.parameters) + f'\n\nMean ROI:\t{self.roi[0]}\nSTD ROI:\t{self.roi[1]}\n\n' + '\n'.join([(' -> '.join(res.date_range) + f':\t{res.roi:.3f}') for res in self]) +'\n\n'  + table
 
+    def __repr__(self) -> str:
+        return self.__str__()
 
 class SweepResults:
 
