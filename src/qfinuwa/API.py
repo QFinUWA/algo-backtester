@@ -16,6 +16,9 @@ try:
 except NameError:
     from tqdm import tqdm      # Probably standard Python interpreter
 
+'''
+NOTE:  The data is derived from the Securities Information Processor (SIP) market-aggregated data.
+'''
 class API:
 
     def __init__(self, api_key_path='API_key.txt', data_folder=None):
@@ -72,36 +75,27 @@ class API:
         # df = df.drop(columns=['open', 'high', 'low'])
         return df
 
-    def allign_data(self):
+    def allign_data(self, dfs):
 
-        filenames = [os.path.join(self.data_folder, file) for file in os.listdir(
-            self.data_folder) if file.endswith('.csv')]
+        if len(dfs)==0:
+            return
 
-        dfs = [(filename, pd.read_csv(os.path.join(filename)))
-               for filename in filenames]
         # go through all stocks and find last start date
-        start_date = max([pd.to_datetime(df['time'].min()) for _, df in dfs])
+        start_date = max([pd.to_datetime(df.index.min()) for _, df in dfs])
         # first end date
-        end_date = min([pd.to_datetime(df['time'].max()) for __, df in dfs])
-
+        end_date = min([pd.to_datetime(df.index.max()) for __, df in dfs])
         # crop dataframes
         with tqdm(dfs) as pbar:
-            for filepath, df in dfs:
-                
+            for filepath, df in dfs:          
                 pbar.set_description(f'> Alligning {filepath}')
-                df['time'] = pd.to_datetime(df['time'])
+                cropped_df = df.loc[(df.index >= start_date) & (df.index <= end_date)]
 
-                cropped_df = df.loc[(df['time'] >=
-                                    start_date) & (df['time'] <= end_date)]
-
-                cropped_df = cropped_df.set_index('time')
                 # fill out with averages
                 filled_df = cropped_df.resample('T').ffill()
 
                 # remove any times not in interval (4:00 - 20:00]
-
-                interval_df = filled_df.loc[(
-                    filled_df.index.hour >= 4) & (filled_df.index.hour < 20)]
+                interval_df = filled_df.loc[(filled_df.index.hour >= 4) & (filled_df.index.hour < 20)]
+                interval_df = interval_df.loc[(interval_df.index.dayofweek != 5) & (interval_df.index.dayofweek != 6)]
 
                 interval_df.to_csv(filepath)
 
@@ -113,38 +107,44 @@ class API:
 
         if isinstance(stocks, str):
             stocks = [stocks]
+        
+        stocks.insert(0, 'SPY')
 
-        years = [1, 2]
-        months = [_ for _ in range(1, 13)]
+        stock_df = []
+
+        years = [2,1]
+        months = range(12,0,-1)
         with tqdm(stocks) as pbar:
             for stock in pbar:
 
                 urls = [self.get_params(stock, year, month)
-                        for year, month in product(years, months)]
+                        for year, month in product(years, months)][:-3]
+
                 n_threads = min(cpu_count(), len(urls))
-                # n_threads = 5 # temp while non premium API key
 
                 pbar.set_description(f'> Fetching {stock} ({n_threads} threads)')
 
                 if not self.is_cached(stock):
-                    # print(f' > Found {stock}.csv cached ... skipping\n')
-
-                    # return
 
                     with ThreadPool(n_threads) as p:
                         results = p.map(self.process_request, urls)
                     # pbar.set_description(f'> Processing {stock}')
                     df = pd.concat(results, axis=0, ignore_index=True)
+                    df['time'] = pd.to_datetime(df['time'])
+                    df = df.set_index('time')
+                    df.sort_values(
+                        by='time', inplace=True)
+                    
+                    
                     # df.to_csv(self.to_path(stock), index=False)
                     # df = df.drop(columns=['open', 'high', 'low']).rename(
                     #     columns={"close": "price"})
-                    df = df.sort_values(
-                        by='time', inplace=False)
-                    df = df[24*60:-24*60]
+                    # df = df[24*60:-24*60]
                     pbar.set_description(f'> Saving {stock} ({len(df)} rows)')
-                    df.to_csv(self.to_path(stock), index=False)
+                    # df.to_csv(self.to_path(stock + '_raw'), index=False)
+                    stock_df.append((self.to_path(stock), df))
 
                 pbar.update(1)
                 pbar.set_description(f'> Done Fetching') # hacky way to set last description but hey it works
-        self.allign_data()
+        self.allign_data(stock_df)
 

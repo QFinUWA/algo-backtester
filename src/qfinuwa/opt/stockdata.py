@@ -16,7 +16,7 @@ except NameError:
 
 class StockData:
 
-    def __init__(self, stocks, data, verbose=False):
+    def __init__(self, stocks: list, data_path: str, verbose: bool=False):
 
         self._indicators = ['open', 'close', 'high', 'low', 'volume']
         self._i = 0
@@ -28,17 +28,25 @@ class StockData:
 
         self._verbose = verbose
 
-        for stock in (tqdm(stocks, desc='> Fetching data') if verbose else stocks):
+        self.spy = None
 
-            _df = pd.read_csv(os.path.join(data, f'{stock}.csv'))
+        if len(stocks) == 0:
+            raise ValueError('No stocks provided')
+
+        for stock in (tqdm(stocks + ['SPY'], desc='> Fetching data') if verbose else stocks):
+
+            _df = pd.read_csv(os.path.join(data_path, f'{stock}.csv'))
             
             if self._L == 0:
                 self._L = len(_df)
                 self._index = pd.to_datetime(_df['time'])
 
+            if stock == 'SPY':
+                self.spy = _df['close'].to_numpy()
+                continue
+
             self._stock_df[stock] = _df[self._indicators]
         self._data = self.compress_data()
-
 
         # pre calcualte the price at every iteration for efficiency
         self._prices = np.array([{stock: self._data[i, 1 + s*5]

@@ -4,7 +4,7 @@ import numpy as np
 from tabulate import tabulate
 import bokeh.plotting
 
-class Result:
+class SingleRunResult:
 
     def __init__(self, stocks, stockdata, datetimeindex, startend, cash, llongs, sshorts):
         self._start, self._end = startend
@@ -30,7 +30,7 @@ class Result:
         self._datetimeindex = datetimeindex.reset_index(drop=True)
         self._stocks = stocks
 
-        self._stockdata = stockdata
+        self._stockdata = stockdata.spy
 
     @property
     def roi(self):
@@ -46,13 +46,13 @@ class Result:
 
         df = pd.DataFrame({stock: [
                 self.longs[stock][0] + self.shorts[stock][0],
-                (self.longs[stock][1] + self.longs[stock][1])/2,
+                (self.longs[stock][1] + self.shorts[stock][1])/2,
                 self._sdv[stock],
                 self.longs[stock][0],
                 self.longs[stock][1],
-                self.shorts[stock][2],
-                self.longs[stock][0],
-                self.longs[stock][1],
+                self.longs[stock][2],
+                self.shorts[stock][0],
+                self.shorts[stock][1],
                 self.shorts[stock][2]] for stock in self._stocks}, index = [f'{b}_{a}' for a,b in itertools.product(['trades', 'longs', 'shorts'], ["n", 'mean_per', 'std'])])
         
         df['Net'] = [ df.iloc[0, :].sum(),
@@ -67,32 +67,29 @@ class Result:
 
         return df
 
-    def plot(self, stocks = None, filename = None):
+    def plot(self, filename = None):
         p = bokeh.plotting.figure(x_axis_type="datetime", title="Portfolio Value over Time", width=1000, height=400)
         p.grid.grid_line_alpha = 0.3
         p.xaxis.axis_label = 'Date'
         p.yaxis.axis_label = 'Portfolio Value'
         
         # -----[plotting portfolio]-----
-        p.line(self._datetimeindex, self.cash, line_width=2)
+        r = [_ for _ in range(len(self.cash))]
+        p.line(r, self.cash, line_width=2)
 
         # -----[plotting buys and sells]-----
         lbuy = [i for i, *_ in self._longs['buy']]
         lsell = [i for i, *_ in self._longs['sell']]
         sbuy = [i for i, *_ in self._shorts['enter']]
         sclose = [i for i, *_ in self._shorts['close']]
+        SIZE = 2
+        p.circle(lbuy, [self.cash[i] for i in lbuy], color='red', size=SIZE)
+        p.circle(lsell, [self.cash[i] for i in lsell], color='green', size=SIZE)
+        p.circle(sbuy, [self.cash[i] for i in sbuy], color='blue', size=SIZE)
+        p.circle(sclose, [self.cash[i] for i in sclose], color='orange', size=SIZE)
 
-        p.circle([self._datetimeindex[i] for i in lbuy], [self.cash[i] for i in lbuy], color='red', size=8)
-        p.circle([self._datetimeindex[i] for i in lsell], [self.cash[i] for i in lsell], color='green', size=8)
-        p.circle([self._datetimeindex[i] for i in sbuy], [self.cash[i] for i in sbuy], color='blue', size=8)
-        p.circle([self._datetimeindex[i] for i in sclose], [self.cash[i] for i in sclose], color='orange', size=8)
-
-        for stock in stocks or []:
-            if stock not in self._stocks:
-                raise ValueError(f'{stock} not in portfolio')
-
-
-            p.line(self._datetimeindex, self._stockdata._stock_df[stock]['close'][self._start:self._end], line_width=2, color='red', legend_label=stock)
+        spy = self._stockdata[self._start:self._end]
+        p.line(r, spy*self.cash[0]/spy[0], line_width=2, color='red', legend_label='SPY')
 
         bokeh.plotting.show(p)
         if filename:
@@ -111,7 +108,7 @@ class Result:
         return self.__str__()
 
 
-class ResultsContainer:
+class MultiRunResult:
 
     def __init__(self, parameters, results):
         a,i = parameters
@@ -152,7 +149,7 @@ class ResultsContainer:
     def __repr__(self) -> str:
         return self.__str__()
 
-class SweepResults:
+class ParameterSweepResult:
 
     def __init__(self, container_results):
 

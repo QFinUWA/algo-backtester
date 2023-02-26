@@ -8,7 +8,7 @@ import collections
 import numpy as np
 import random
 from tabulate import tabulate
-from .opt.result import Result, ResultsContainer, SweepResults
+from .opt.result import SingleRunResult, MultiRunResult, ParameterSweepResult
 import math
 from .algorithm import Algorithm
 from .indicators import Indicators
@@ -145,7 +145,7 @@ class Backtester:
         for alg_params, ind_params in tqdm(itertools.product(strategy_params_list, indicator_params_list), total=len(strategy_params_list) * len(indicator_params_list), desc=f"Running paramter sweep (cv={cv})"):
             res.append(self.run(algorithm_params=alg_params, indicator_params=ind_params, cv=cv, seed=seed, progressbar=False))
         
-        return SweepResults(res)
+        return ParameterSweepResult(res)
         # TODO: add something to deal with reading nan values in portfolio
 
     '''
@@ -210,10 +210,10 @@ class Backtester:
             for params in (tqdm(test, desc=desc, total = end-start, mininterval=0.5) if progressbar and cv == 1 else test):
                 algorithm.run_on_data(params, portfolio)
             cash, longs, shorts = portfolio.wrap_up()
-            results.append(Result(self.stocks, self._data, self._data.index, (start, end), cash, longs, shorts ))
+            results.append(SingleRunResult(self.stocks, self._data, self._data.index, (start, end), cash, longs, shorts ))
             #-------------------------------------#
 
-        return ResultsContainer((algorithm_params, indicator_params), results)
+        return MultiRunResult((algorithm_params, indicator_params), results)
 
     def get_random_periods(self, n):
 

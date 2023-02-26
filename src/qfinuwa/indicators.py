@@ -20,7 +20,8 @@ class Indicators:
         # for func_name, func in self._indicator_functions.items():
         self.add_parameters(self.params)
 
-    
+        # TODO: optimsie by caching the precomputed indicator values 
+
     #----[ Properties ]--------------------------------------------------------
     @property
     def indicators(self):
