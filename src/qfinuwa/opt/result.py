@@ -30,7 +30,7 @@ class SingleRunResult:
         self._datetimeindex = datetimeindex.reset_index(drop=True)
         self._stocks = stocks
 
-        self._stockdata = stockdata.spy
+        self._stockdata = stockdata._stock_df
 
     @property
     def roi(self):
@@ -66,34 +66,6 @@ class SingleRunResult:
                         self._sdv_shorts]
 
         return df
-
-    def plot(self, filename = None):
-        p = bokeh.plotting.figure(x_axis_type="datetime", title="Portfolio Value over Time", width=1000, height=400)
-        p.grid.grid_line_alpha = 0.3
-        p.xaxis.axis_label = 'Date'
-        p.yaxis.axis_label = 'Portfolio Value'
-        
-        # -----[plotting portfolio]-----
-        r = [_ for _ in range(len(self.cash))]
-        p.line(r, self.cash, line_width=2)
-
-        # -----[plotting buys and sells]-----
-        lbuy = [i for i, *_ in self._longs['buy']]
-        lsell = [i for i, *_ in self._longs['sell']]
-        sbuy = [i for i, *_ in self._shorts['enter']]
-        sclose = [i for i, *_ in self._shorts['close']]
-        SIZE = 2
-        p.circle(lbuy, [self.cash[i] for i in lbuy], color='red', size=SIZE)
-        p.circle(lsell, [self.cash[i] for i in lsell], color='green', size=SIZE)
-        p.circle(sbuy, [self.cash[i] for i in sbuy], color='blue', size=SIZE)
-        p.circle(sclose, [self.cash[i] for i in sclose], color='orange', size=SIZE)
-
-        spy = self._stockdata[self._start:self._end]
-        p.line(r, spy*self.cash[0]/spy[0], line_width=2, color='red', legend_label='SPY')
-
-        bokeh.plotting.show(p)
-        if filename:
-            bokeh.plotting.output_file(filename)
     
     def save(self, filename):
         with open(filename, 'w') as f:

@@ -91,7 +91,7 @@ class API:
                 cropped_df = df.loc[(df.index >= start_date) & (df.index <= end_date)]
 
                 # fill out with averages
-                filled_df = cropped_df.resample('T').ffill()
+                filled_df = cropped_df.resample('T').mean().interpolate(method='time')
 
                 # remove any times not in interval (4:00 - 20:00]
                 interval_df = filled_df.loc[(filled_df.index.hour >= 4) & (filled_df.index.hour < 20)]

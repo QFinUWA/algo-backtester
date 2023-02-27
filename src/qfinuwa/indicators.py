@@ -4,13 +4,17 @@ import inspect
 from itertools import product
 from collections import defaultdict
 import numpy as np
+from .opt.stockdata import StockData
 
 class Indicators:
 
-    def __init__(self, stockdata):
+    def __init__(self, stockdata='data'):
 
         self.params = self.defaults
         # self._stockdata = stockdata
+        if isinstance(stockdata, str):
+            stockdata = StockData(data_path=stockdata)
+
         self._data = stockdata._stock_df
         self._L = len(stockdata)
         # self._L = 3
@@ -23,10 +27,30 @@ class Indicators:
         # TODO: optimsie by caching the precomputed indicator values 
 
     #----[ Properties ]--------------------------------------------------------
+    # @property
+    def indicator_values(self, params=None):
+        if params is None:
+            params = self.params
+
+        params = self._fill_in_params(params)
+        self.add_parameters(params)
+
+        # params maps function name to parameters
+
+        return {indicator: {stock: val for stock, val in  self._get_cached(funcn, params[funcn], indicator).items()} for funcn, indicators in self._funcn_to_indicator_map.items() for indicator in indicators}
+
     @property
     def indicators(self):
         return sorted(sum((v for v in self._funcn_to_indicator_map.values()), start = []))
 
+    @property
+    def _singles(self):
+        return sorted(sum((v for k,v in self._funcn_to_indicator_map.items() if self._is_single(k)), start = []))
+    
+    @property
+    def _multis(self):
+        return sorted(sum((v for k,v in self._funcn_to_indicator_map.items() if not self._is_single(k)), start = []))
+    
     @property
     def indicator_groups(self):
         return sorted(list(self._funcn_to_indicator_map.keys()))
@@ -37,7 +61,14 @@ class Indicators:
         cls = type(self)
 
         return {k: v for k, v in inspect.getmembers(cls)
-                if callable(v) and hasattr(getattr(cls, k), 'Indicator') and not k.startswith('__')}
+                if callable(v) and (hasattr(getattr(cls, k), 'SingleIndicator') or hasattr(getattr(cls, k), 'MultiIndicator')) and not k.startswith('__')}
+
+
+    def _is_single(self, indicator_function_name):
+        if indicator_function_name not in self._indicator_functions:
+            raise ValueError(f'Invalid indicator function name: {indicator_function_name}')
+        return hasattr(getattr(type(self), indicator_function_name), 'SingleIndicator')
+
 
     @property
     def defaults(self):
@@ -49,6 +80,7 @@ class Indicators:
                 for k, v in signature.parameters.items()
                 if v.default is not inspect.Parameter.empty
             }
+       
         return {name: get_defaults(function) for name, function in self._indicator_functions.items()}
 
     @property
@@ -56,11 +88,19 @@ class Indicators:
         return list(self._data.keys())
 
     @classmethod
-    def Indicator(cls, func):
+    def SingleIndicator(cls, func):
         @wraps(func)
         def wrapper_func(*_args, **_kwargs):
             return func(*_args, **_kwargs)
-        wrapper_func.Indicator = True
+        wrapper_func.SingleIndicator = True
+        return wrapper_func
+    
+    @classmethod
+    def MultiIndicator(cls, func):
+        @wraps(func)
+        def wrapper_func(*_args, **_kwargs):
+            return func(*_args, **_kwargs)
+        wrapper_func.MultiIndicator = True
         return wrapper_func
 
     # ----[/Properties]--------------------------------------------------------
@@ -109,7 +149,7 @@ class Indicators:
             return
         
         to_cache = dict()
-        for stock, data in self._data.items():
+        for stock, data in (self._data.items() if self._is_single(func_name) else [('.', self._data)]):
 
             out = func(self, data, **params)
             if not isinstance(out, dict):
@@ -117,7 +157,6 @@ class Indicators:
 
             self._funcn_to_indicator_map[func_name] = sorted(list(out.keys()))
     
-            # for indicator, value in out.items():
             for indicator, value in out.items():
                 if indicator not in to_cache:
                     to_cache[indicator] = dict()
@@ -130,9 +169,9 @@ class Indicators:
     def _hashable(self, function_name, params):
         return (function_name, tuple(sorted(params.items())))
 
-    def _cache_indicator(self, function_name, params, stock_values):
+    def _cache_indicator(self, function_name, params, values):
         key = self._hashable(function_name, params)
-        self._cache[key] = stock_values
+        self._cache[key] = values
         return
 
     def _is_cached(self, function_name, params):
@@ -181,7 +220,7 @@ class Indicators:
     def iterate_params(self, params=None):
 
         if params is None:
-            params = self.defaults
+            params = self.params
 
         params = self._fill_in_params(params)
         self.add_parameters(params)
@@ -189,12 +228,15 @@ class Indicators:
         # params maps function name to parameters
 
         self._indicators_iterations = {indicator: np.array(list(self._get_cached(funcn, params[funcn], indicator).values())) for funcn, indicators in self._funcn_to_indicator_map.items() for indicator in indicators}
-       
+
         return self.__iter__()
     
     def __iter__(self):
-        self._iterate_indicators = {stock: {indicator: None for indicator in self.indicators} for stock in self._stocks}
-        self._indexes = list(product(range(len(self._stocks)), self.indicators))
+        self._iterate_indicators = {indicator: {stock: None for stock in self._stocks} for indicator in self._singles}
+        self._iterate_indicators.update({indicator: None for indicator in self._multis})
+
+        self._indexes_single = list(product(self._singles, range(len(self._stocks))))
+        self._indexes_multi = self._multis
         self._i = 1
         return self
 
@@ -202,13 +244,17 @@ class Indicators:
         if self._i > len(self):
             self._indicators_iterations = None
             self._iterate_indicators = None
-            self._indexes = None
+            self._indexes_single = None
+            self._indexes_multi = None
             self._i = None
             raise StopIteration(f'Index {self._i } out of range.')
 
-        for s, indicator in self._indexes: 
-            self._iterate_indicators[self._stocks[s]][indicator] = self._indicators_iterations[indicator][s, :self._i]
+        for indicator, s in self._indexes_single: 
+            self._iterate_indicators[indicator][self._stocks[s]] = self._indicators_iterations[indicator][s, :self._i]
 
+        for indicator in self._indexes_multi:
+            self._iterate_indicators[indicator] = self._indicators_iterations[indicator][0, :self._i]
+        
         self._i += 1
         return self._iterate_indicators
 

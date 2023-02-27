@@ -16,7 +16,7 @@ except NameError:
 
 class StockData:
 
-    def __init__(self, stocks: list, data_path: str, verbose: bool=False):
+    def __init__(self, data_path: str, stocks: list = None, verbose: bool=False):
 
         self._indicators = ['open', 'close', 'high', 'low', 'volume']
         self._i = 0
@@ -29,6 +29,9 @@ class StockData:
         self._verbose = verbose
 
         self.spy = None
+
+        if stocks is None:
+            stocks = [os.listdir(data_path)[0].split('.')[0]]
 
         if len(stocks) == 0:
             raise ValueError('No stocks provided')
@@ -48,15 +51,16 @@ class StockData:
             self._stock_df[stock] = _df[self._indicators]
         self._data = self.compress_data()
 
+        self._stocks = sorted(stocks)
+
         # pre calcualte the price at every iteration for efficiency
         self._prices = np.array([{stock: self._data[i, 1 + s*5]
                                 for s, stock in enumerate(stocks)} for i in range(self._L)])
 
-        self.sis = {s: dict() for s in stocks}
-        self.sinames = [(stock, indicator, i) for i, (stock, indicator) in enumerate(
-                        product(self.sis, self._indicators))]
-
-        self._stocks = stocks
+        # self.sis = {s: dict() for s in stocks}
+        self.sinames = [(indicator, stock , i) for indicator, (i, stock) in 
+                        product(self._indicators, enumerate(self._stocks))]
+        
 
     @property
     def stocks(self):
@@ -65,22 +69,15 @@ class StockData:
     @property
     def prices(self):
         siss = []
-        for index in (tqdm(range(len(self)), total=len(self), desc = '> Precompiling data', mininterval=0.5) if self._verbose else range(len(self))):
-            A = {stock: dict() for stock in self.sis}
-            for stock, indicator, i in self.sinames:
-                A[stock][indicator] = self._data[:index+1, i]
+        for index in (tqdm(range(len(self)),  desc = '> Precompiling data', mininterval=0.5) if self._verbose else range(len(self))):
+            A = {indicator: dict() for indicator in self._indicators}
+            
+            for indicator, stock, i in self.sinames:
+                A[indicator][stock] = self._data[:index+1, i]
             siss.append(A)
+
+
         return self._prices, siss
-
-    def get(self, index):
-
-        for stock, indicator, i in self.sinames:
-            self.sis[stock][indicator] = self._data[:index, i]
-        
-        return self.sis
-
-    def len(self):
-        return self._L
     
     def __len__(self):
         return self._L
@@ -92,4 +89,4 @@ class StockData:
     def compress_data(self):
 
         return np.concatenate(
-            [df.loc[:, df.columns != 'time'].to_numpy() for df in self._stock_df.values()], axis=1).astype('float64')
+            [df.loc[:, df.columns != 'time'].to_numpy() for df in sorted(self._stock_df.values())], axis=1).astype('float64')

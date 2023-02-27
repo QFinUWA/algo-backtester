@@ -37,7 +37,7 @@ class Backtester:
             raise ValueError('Strategy must be a subclass of Algorithm')   
         self._strategy = strategy
 
-        self._data = StockData(stocks, data, verbose=True)
+        self._data = StockData(data, stocks=stocks, verbose=True)
         self._precomp_prices = self._data.prices
 
         # raise expection if indiators is not a subclass of Indicators
@@ -103,7 +103,9 @@ class Backtester:
                 f'\t- Params: {self.algorithm_params}\n' + \
                 f'- Indicators: {self._indicators.__class__.__name__}\n' + \
                 f'\t- Params: {self.indicator_params}\n' + \
-                f'\t- Indicators: {self._indicators.indicator_groups}\n' + \
+                f'\t- Indicator Groups: {self._indicators.indicator_groups}\n' + \
+                f'\t- SingleIndicators: {self._indicators._singles}\n' \
+                f'\t- MultiIndicators: {self._indicators._multis}\n' \
                 f'- Stocks: {self.stocks}\n' + \
                 f'- Fee {self.fee}\n' + \
                 f'- Days: {self._days}\n'
@@ -152,7 +154,7 @@ class Backtester:
     Backtests the stored strategy. 
     '''
 
-    def run(self, algorithm_params = None, indicator_params = None, progressbar=True, cv=1, seed=None, precomp_indicators=None):
+    def run(self, algorithm_params = None, indicator_params = None, progressbar=True, cv=1, seed=None):
 
         if not self._strategy:
             raise ValueError('No algorithm specified')
@@ -184,8 +186,8 @@ class Backtester:
 
         # precomp_indicators = 4.e-7 * np.mean([r[1] - r[0] for r in random_periods]) * cv
 
-        if precomp_indicators:
-            data = list(data)
+        # if precomp_indicators:
+        #     data = list(data)
 
         # print(list((zip(*self._precomp_prices)))[0])
 
@@ -197,17 +199,16 @@ class Backtester:
                 algorithm = self._strategy(*tuple(), **algorithm_params)
             else:
                 algorithm = self._strategy(*tuple())
+            # if precomp_indicators:
+                # test = data[start:end]
+            # else:
+            test = islice(data, start, end) 
             
-            if precomp_indicators:
-                test = data[start:end]
-            else:
-                test = islice(data, start, end) 
-
             # TODO: test speed
             # TODO: test speed of .get
-
             #---------[RUN THE ALGORITHM]---------#
             for params in (tqdm(test, desc=desc, total = end-start, mininterval=0.5) if progressbar and cv == 1 else test):
+                
                 algorithm.run_on_data(params, portfolio)
             cash, longs, shorts = portfolio.wrap_up()
             results.append(SingleRunResult(self.stocks, self._data, self._data.index, (start, end), cash, longs, shorts ))
