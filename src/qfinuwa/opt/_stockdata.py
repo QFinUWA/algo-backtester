@@ -87,7 +87,7 @@ class StockData:
     def _compress_data(self) -> np.ndarray:
 
         return np.concatenate(
-            [df.loc[:, df.columns != 'time'].to_numpy() for df in sorted(self._stock_df.values())], axis=1).astype('float64')
+            [df.loc[:, df.columns != 'time'].to_numpy() for _, df in sorted(self._stock_df.items())], axis=1).astype('float64')
     
     #---------------[Internal Methods]-----------------#
     def __len__(self):

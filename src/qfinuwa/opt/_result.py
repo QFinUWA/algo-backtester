@@ -13,8 +13,8 @@ class SingleRunResult:
         self._longs = longs
         self._shorts = shorts 
 
-        longs = {stock: [p for _,s,p in longs['sell'] if s == stock] for stock in stocks}
-        shorts = {stock: [p for _,s,p in shorts['cover'] if s == stock] for stock in stocks}
+        longs = {stock: [p for _,s,p in longs['exit'] if s == stock] for stock in stocks}
+        shorts = {stock: [p for _,s,p in shorts['exit'] if s == stock] for stock in stocks}
         self.longs = {k: (len(v), np.mean(v or [0]), np.std(v or [0])) for k,v in longs.items()}
         self.shorts = {k: (len(v), np.mean(v or [0]), np.std(v or [0])) for k,v in shorts.items()}
         self._sdv = {stock: np.std(longs[stock] + shorts[stock] or [0]) for stock in stocks}
@@ -84,7 +84,7 @@ class MultiRunResult:
     def __init__(self, parameters: dict, results: tuple):
         a,i = parameters
         self.parameters = {
-            'algorithm': a,
+            'strategy': a,
             'indicator': i
         }
 
@@ -129,7 +129,7 @@ class ParameterSweepResult:
         i = dict()
         for result in multi_results:
 
-            for para, val in result.parameters['algorithm'].items():
+            for para, val in result.parameters['strategy'].items():
                 a[para] = sorted(a.get(para, []) + [str(val)])
 
             for indic, params in result.parameters['indicator'].items():
@@ -140,7 +140,7 @@ class ParameterSweepResult:
 
 
         self.parameters = {
-            'algorithm_paramters': a,
+            'strategy_paramters': a,
             'indicator_parameters': i
         }
 

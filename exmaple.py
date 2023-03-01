@@ -1,17 +1,17 @@
 # this is for development
-from qfinuwa import Algorithm
+from qfinuwa import Strategy
 from qfinuwa import Backtester
 from qfinuwa import API
 
 import random
 
-class RandomAlgorithm(Algorithm):
+class RandomStrategy(Strategy):
 
-        @Algorithm.indicator
+        @Strategy.indicator
         def vol_difference(data, lookback=100, gum = None):
             return data['volume'].diff() + lookback
 
-        @Algorithm.indicator
+        @Strategy.indicator
         def cumsum(data, sum=None):
             return data['volume'].cumsum()
 
@@ -43,7 +43,7 @@ if __name__ == "__main__":
     backtester = Backtester( ['AAPL', 'GOOG'],
                             data=data_folder_dir,  months=3, fee=0.01)
 
-    backtester.update_strategy(RandomAlgorithm)
+    backtester.update_strategy(RandomStrategy)
 
 
     backtester.set_strategy_params({

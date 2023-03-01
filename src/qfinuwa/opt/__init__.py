@@ -1,4 +1,4 @@
-from .stockdata import StockData
+from ._stockdata import StockData
 
 class StockData(StockData):
     pass

@@ -11,13 +11,13 @@ pip install qfinuwa
 ## API
 
 
-## Algorithm
+## Strategy
 
-You algorithm can be initialised as follows:
+You strategy can be initialised as follows:
 
 ```py
 
-class MyCustomStrategy(Algorithm):
+class MyCustomStrategy(Strategy):
   
     def __init__(self):
         return
@@ -40,7 +40,7 @@ To add an indicator to be passed into ``on_data`` during evalutation, define a n
 
 ```py
 # super bad example I need to change this
-class MyCustomStrategy(Algorithm):
+class MyCustomStrategy(Strategy):
   
     def __init__(self):
         return
@@ -48,7 +48,7 @@ class MyCustomStrategy(Algorithm):
     def on_data(self, data, indicators, portfolio):
         return
 
-    @Algorithm.indicator
+    @Strategy.indicator
     def vol_difference(data):
         return data['volume'].diff() + addition
 ```
@@ -64,15 +64,15 @@ In the above example we added an indicator called ``"vol_difference"`` that can 
         return
 ```
 
-We can also add parameters to the indicator and algorithm itself, but we'll see that later.
+We can also add parameters to the indicator and strategy itself, but we'll see that later.
 
 ## Backtester 
 
 The ``Backtester`` class runs backtests given the inputs:
-- An algorithm to test
+- An strategy to test
 - Data to test it on
-- Hyperparameters for the algorithm including
-  - Algorithm Hyperparameters
+- Hyperparameters for the strategy including
+  - Strategy Hyperparameters
   - Indicator Hyperparameters
 - Starting Balance and Fee
 - Evaluation time
@@ -83,7 +83,7 @@ A backtester can be initialised like so:
 backtester = Backtester(['AAPL', 'GOOG'])
 ```
 
-You can pass in your algorithm when initialising, or later.
+You can pass in your strategy when initialising, or later.
 
 ```py
 backtester = Backtester(['AAPL', 'GOOG'], strategy=MyCustomStrategy)

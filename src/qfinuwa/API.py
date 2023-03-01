@@ -8,6 +8,7 @@ from IPython import get_ipython
 import requests
 import zipfile
 import io
+from typing import Union
 
 try:
     shell = get_ipython().__class__.__name__
@@ -50,7 +51,7 @@ class API:
     
 
     @classmethod
-    def fetch_stocks(cls, stocks: str | list, api_key_path: str, data_folder: str) -> None:
+    def fetch_stocks(cls, stocks: Union[str,  list], api_key_path: str, data_folder: str) -> None:
         '''
         Fetches the data from the SIP market-aggregated data. The data is provided by the SEC. An API key is required. The data is stored in the folder specified by `data_folder`.
 
@@ -90,7 +91,8 @@ class API:
 
                 pbar.set_description(f'> Fetching {stock} ({n_threads} threads)')
 
-                if not cls._is_cached(stock):
+                path = os.path.join(data_folder, f"{stock}.csv")
+                if not os.path.exists(path):
 
                     with ThreadPool(n_threads) as p:
                         results = p.map(cls._process_request, urls)
@@ -103,7 +105,8 @@ class API:
                     
                     pbar.set_description(f'> Saving {stock} ({len(df)} rows)')
                     # df.to_csv(cls.to_path(stock + '_raw'), index=False)
-                    stock_df.append((cls._to_path(stock), df))
+                    path = os.path.join(data_folder, f"{stock}.csv")
+                    stock_df.append((path, df))
 
                 pbar.update(1)
                 pbar.set_description(f'> Done Fetching') # hacky way to set last description but hey it works
@@ -155,13 +158,6 @@ class API:
         #     f'https://www.alphavantage.co/query?{urlparse.urlencode(params)}')
         return f'https://www.alphavantage.co/query?{urlparse.urlencode(params)}'
 
-    @classmethod
-    def _to_path(cls, stock: str) -> str:
-        return os.path.join(cls.data_folder, f"{stock}.csv")
-
-    @classmethod
-    def _is_cached(cls, stock: str) -> bool:
-        return os.path.exists(cls._to_path(stock))
 
     @classmethod
     def _process_request(cls, url_request: str) -> pd.DataFrame:

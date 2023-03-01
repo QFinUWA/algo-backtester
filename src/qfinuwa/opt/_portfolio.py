@@ -19,7 +19,6 @@ class Portfolio:
         # self._short_value = 0
         self._longs = {stock: [] for stock in stocks}
         self._n_longs = {stock: 0 for stock in stocks}
-        # maybe make a heap or linked list??
         self._shorts = {stock: [] for stock in stocks}
         self._n_shorts = {stock: 0 for stock in stocks}
 
@@ -59,194 +58,178 @@ class Portfolio:
         raise ValueError('Cannot modify Portfolio.cash ... you cheeky bugger')
 
     #---------------[Public Methods]-----------------#
-    def buy_long(self,  stock: str, quantity: float=None, cost: float=None) -> int:
-        try:
-            quantity_bool = quantity is not None
-            cost_bool = cost is not None
-
-            if not quantity_bool ^ cost_bool:
-                raise TypeError('Please input quanity OR cost.')
-
-            ##
-            if cost_bool:
-                quantity = cost*self._fee_div/self._curr_prices[stock]
-            
-            ##
-            elif quantity_bool:
-                cost = quantity*self._curr_prices[stock]*self._fee_mult
-
-            if cost > self._cash:
-                return 0
-
-            self._cash -= cost
-
-            self._n_longs[stock] += quantity
-
-            heapq.heappush(self._longs[stock], (cost, quantity))
-            self._long_stats['buy'].append((self._i, stock, quantity))
-
-            return 1
-        except Exception as e:
-            return 0
-
-    def sell_long(self,  stock: str, quantity: float=None, price : float=None) -> int:
-
-        try:
+    def enter_position(self, direction: str,  stock: str, quantity: float=None, value: float=None) -> int:
+        quantity_bool = quantity is not None
+        cost_bool = value is not None
+        if not quantity_bool ^ cost_bool:
+            raise TypeError('Please input quanity OR cost.')
         
-            quantity_bool = quantity is not None
-            price_bool = price is not None
+        try:
+            if direction == 'long':
 
-            if not quantity_bool ^ price_bool:
-                raise TypeError('Please input quanity OR cost.')
-
-            ##
-            if price_bool:
-                quantity = price*self._fee_div/self._curr_prices[stock]
-
-            ##
-            elif quantity_bool:
-                price = quantity*self._curr_prices[stock]*self._fee_div
-
-            ## --------
-            abs_rem = abs_rem_original = quantity if quantity_bool else price
-            total_pay, total_cost = 0, 0
-
-            while self._longs[stock]:
-                # no more shorts to sell
-                if abs_rem == 0:
-                    break
-
-                cos, quant = self._longs[stock][0]
-
-                # quantity we are decreasing to 0 - if quantity is specified 
-                # we want to keep closing positions until rem_quanity is 0,
-                # same for cost - this is a more consice and neater way to 
-                # do this but could also use an if else pattern with repitition 
-                abs_amount = quant if quantity_bool else cos
-
-                # cannot sell whole position - sell franction
-                if abs_amount > abs_rem:
-                    frac = abs_rem/abs_amount
-                    
-                    self._longs[stock][0] = cos*(frac-1), quant*(1-frac)
-                    self._n_longs[stock] -= quant*(1-frac)
-                    total_cost += frac*cos
-                    total_pay += frac*quant*self._curr_prices[stock]
-                    abs_rem = 0
-                    break
-
-                heapq.heappop(self._longs[stock])
-
-                abs_rem -= abs_amount
-                total_cost += cos
-                total_pay += quant*self._curr_prices[stock]
-                self._n_longs[stock] -= quant
+                ##
+                if cost_bool:
+                    quantity = value*self._fee_div/self._curr_prices[stock]
                 
-            if abs_rem == abs_rem_original:
-                return 0
-            ## -----
+                ##
+                elif quantity_bool:
+                    value = quantity*self._curr_prices[stock]*self._fee_mult
+
+                if value > self._cash:
+                    return 0
+
+                self._cash -= value
+
+                self._n_longs[stock] += quantity
+
+                heapq.heappush(self._longs[stock], (value, quantity))
+                self._long_stats['buy'].append((self._i, stock, quantity))
+
+                return 1
+            elif direction == 'short':
+                ##
+                if cost_bool:
+                    quantity = value*self._fee_div/self._curr_prices[stock]
+
+                ##
+                elif quantity_bool:
+                    value = quantity*self._curr_prices[stock]*self._fee_mult
             
-            self._cash += total_pay
-            self._long_stats['sell'].append((self._i, stock, total_pay - total_cost))
-            
-            return 1
+                if value > self._cash:
+
+                    return 0
+
+                self._cash -= value
+
+                self._n_shorts[stock] += quantity
+                heapq.heappush(self._shorts[stock], (-value, quantity))
+                self._short_stats['enter'].append((self._i, stock, quantity))
+                return 1  
         except Exception as e:
             return 0
-
-    def sell_short(self, stock: str, quantity: float=None, cost: float=None) -> int:
-
-        try:
-            quantity_bool = quantity is not None
-            cost_bool = cost is not None
-
-            if not quantity_bool ^ cost_bool:
-                raise TypeError('Please input quanity OR cost.')
-
-            ##
-            if cost_bool:
-                quantity = cost*self._fee_div/self._curr_prices[stock]
-
-            ##
-            elif quantity_bool:
-                price = quantity*self._curr_prices[stock]*self._fee_mult
         
-            if price > self._cash:
+        return 0
 
-                return 0
+    def exit_position(self, direction: str,  stock: str, quantity: float=None, value : float=None) -> int:
 
-            self._cash -= price
+        quantity_bool = quantity is not None
+        price_bool = value is not None
 
-            self._n_shorts[stock] += quantity
-            heapq.heappush(self._shorts[stock], (-price, quantity))
-            self._short_stats['enter'].append((self._i, stock, quantity))
-            return 1
-        except Exception as e:
-            return 0
-
-    def cover_short(self, stock: str, quantity: float=None, cost: float=None) -> int:
+        if not quantity_bool ^ price_bool:
+            raise TypeError('Please input quanity OR cost.')
         try:
-            quantity_bool = quantity is not None
-            cost_bool = cost is not None
+            if direction == 'long':
 
-            if not quantity_bool ^ cost_bool:
-                raise TypeError('Please input quanity OR cost.')
-    
-            cost_to_buy = 0
-            deposit = 0
-            
-            abs_rem = abs_rem_original = quantity if quantity_bool else cost
-            while self._shorts[stock]:
-                # no more shorts to sell
-                if abs_rem == 0:
-                    break
+                ##
+                if price_bool:
+                    quantity = value*self._fee_div/self._curr_prices[stock]
 
-                cos, quant = self._shorts[stock][0]
+                ##
+                elif quantity_bool:
+                    value = quantity*self._curr_prices[stock]*self._fee_div
 
-                cos *= -1
+                ## --------
+                abs_rem = abs_rem_original = quantity if quantity_bool else value
+                total_pay, total_cost = 0, 0
 
-                # quantity we are decreasing to 0 - if quantity is specified 
-                # we want to keep closing positions until rem_quanity is 0,
-                # same for cost - this is a more consice and neater way to 
-                # do this but could also use an if else pattern with repitition 
-                abs_amount = quant if quantity_bool else cos
+                while self._longs[stock]:
+                    # no more shorts to sell
+                    if abs_rem == 0:
+                        break
 
-                # cannot sell whole position - sell franction
-                if abs_amount > abs_rem:
-                    frac = abs_rem/abs_amount
+                    cos, quant = self._longs[stock][0]
+
+                    # quantity we are decreasing to 0 - if quantity is specified 
+                    # we want to keep closing positions until rem_quanity is 0,
+                    # same for cost - this is a more consice and neater way to 
+                    # do this but could also use an if else pattern with repitition 
+                    abs_amount = quant if quantity_bool else cos
+
+                    # cannot sell whole position - sell franction
+                    if abs_amount > abs_rem:
+                        frac = abs_rem/abs_amount
+                        
+                        self._longs[stock][0] = cos*(frac-1), quant*(1-frac)
+                        self._n_longs[stock] -= quant*(1-frac)
+                        total_cost += frac*cos
+                        total_pay += frac*quant*self._curr_prices[stock]
+                        abs_rem = 0
+                        break
+
+                    heapq.heappop(self._longs[stock])
+
+                    abs_rem -= abs_amount
+                    total_cost += cos
+                    total_pay += quant*self._curr_prices[stock]
+                    self._n_longs[stock] -= quant
                     
-                    self._shorts[stock][0] = cos*(frac-1), quant*(1-frac)
+                if abs_rem == abs_rem_original:
+                    return 0
+                ## -----
+                
+                self._cash += total_pay
+                self._long_stats['sell'].append((self._i, stock, total_pay - total_cost))
+                
+                return 1
+            elif direction == 'short':
+        
+                cost_to_buy = deposit = 0
+                
+                abs_rem = abs_rem_original = quantity if quantity_bool else value
+                while self._shorts[stock]:
+                    # no more shorts to sell
+                    if abs_rem == 0:
+                        break
 
-                    deposit += frac*cos
-                    cost_to_buy += frac*quant*self._curr_prices[stock]
-                    self._n_shorts[stock] -= frac*quant
-                    abs_rem = 0
-                    break
+                    cos, quant = self._shorts[stock][0]
 
-                heapq.heappop(self._shorts[stock])
+                    cos *= -1
 
-                abs_rem -= abs_amount
-                deposit += cos
-                cost_to_buy += quant*self._curr_prices[stock]
-                self._n_shorts[stock] -= quant
+                    # quantity we are decreasing to 0 - if quantity is specified 
+                    # we want to keep closing positions until rem_quanity is 0,
+                    # same for cost - this is a more consice and neater way to 
+                    # do this but could also use an if else pattern with repitition 
+                    abs_amount = quant if quantity_bool else cos
 
-            if abs_rem == abs_rem_original:
-                return 0
+                    # cannot sell whole position - sell franction
+                    if abs_amount > abs_rem:
+                        frac = abs_rem/abs_amount
+                        
+                        self._shorts[stock][0] = cos*(frac-1), quant*(1-frac)
 
-            profit = deposit - self._fee_mult*cost_to_buy 
-            self._cash += profit + deposit
+                        deposit += frac*cos
+                        cost_to_buy += frac*quant*self._curr_prices[stock]
+                        self._n_shorts[stock] -= frac*quant
+                        abs_rem = 0
+                        break
 
-            self._short_stats['close'].append((self._i, stock, profit))
-            return 1
+                    heapq.heappop(self._shorts[stock])
+
+                    abs_rem -= abs_amount
+                    deposit += cos
+                    cost_to_buy += quant*self._curr_prices[stock]
+                    self._n_shorts[stock] -= quant
+
+                if abs_rem == abs_rem_original:
+                    return 0
+
+                profit = deposit - self._fee_mult*cost_to_buy 
+                self._cash += profit + deposit
+
+                self._short_stats['close'].append((self._i, stock, profit))
+                return 1
         except Exception as e:
             return 0
+        return 0
+
         
     def wrap_up(self):
         l_remaining  = {stock: sum(q for _,q in self._longs[stock]) for stock in self._stocks}
         s_remaining = {stock: sum(q for _,q in self._shorts[stock]) for stock in self._stocks}
 
         for stock in self._stocks:
-            self.sell_long(stock, quantity=l_remaining[stock])
-            self.cover_short(stock, quantity=s_remaining[stock])
+            self.exit_position('long', stock, quantity=l_remaining[stock])
+            self.exit_position('short', stock, quantity=s_remaining[stock])
         
         return (self._cash_history, self._long_stats, self._short_stats)
     

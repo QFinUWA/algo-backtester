@@ -10,6 +10,86 @@ class Indicators:
 
     def __init__(self, stockdata='data'):
 
+        '''
+        # Indicators Base Class
+
+        This is the base class for all indicators. It is not meant to be used directly.
+
+        To create a custom indicator, create a function that takes in a data and returns a dictionary of indicator values.
+
+        In all cases, the input data will be a pandas dataframe with the following columns: ``open``, ``high``, ``low``, ``close``, ``volume``.
+
+        There are two classes of indicators: single and multi. 
+        
+
+        ## Single Indicators
+        Given a dictionary of stocks and their data, return a dictionary of of indicator names and values.
+
+        ### Example input and output
+        ```python
+        input = {'AAPL': pd.Dataframe({'close': [1, 2, 3, ...], 'volume': [100, 200, 300, ...], ...}), 
+                 'MSFT': pd.Dataframe({'close': [4, 5, 6, ...], 'volume': [400, 500, 600, ...], ...}), ...}
+        output = {'added_volume': [5, 7, 9, ...], 'constant_0': [0,0,0 ...], ...},
+        ```
+
+        ## Multi Indicators 
+        Given a sinlge arbitary stock's data, return a dictionary of of indicator names and values.
+
+        ### Example input and output
+        ```python
+        input = pd.Dataframe({'close': [1, 2, 3, ...], 'volume': [100, 200, 300, ...], ...})
+        output = {'double_close': [2, 4, 6, ...], 'triple_volume': [300, 600, 900, ...], ...}
+        ```
+
+        ## Indicators in ``on_data``
+
+        Your indicators will be passed into ``on_data`` as a dictionary of indicator names and values.
+
+        For your ``SingleIndicators``, the dictionary will be of the form 
+        ```python
+        indicators["single_indicatorA"] =  np.array
+        indicators["single_indicatorB"] =  np.array
+        ```
+
+        For your ``MultiIndicators``, the dictionary will be of the form 
+        ```py
+        indicators["multi_indicatorA"]: {'stockA': np.array, 'stockB': np.array, ... }
+        indicators["multi_indicatorB"]: {'stockB': np.array, 'stockB': np.array, ... }
+        ```
+
+        ## Hyperparameters
+
+        You can define hyperparameters for each indicator by adding them as keyword arguments to the indicator function.
+
+        The default values will be used when ``backtester`` is created. You can then update those values by calling
+        ``backtester.update_params``.
+
+        Additionally you can supply a range of values for each hyperparameter. The ``backtester`` will then run the strategy
+        for every combination of hyperparameters (``run_grid_search``).
+
+        Any time you update the hyperparameters, the indicators will be recalculated and cached (they will only be calucated once).
+
+        ## Example 
+        class MyIndicators(Indicators):
+
+        ```python
+            @Indicators.MultiIndicator
+            def sum_of_volumes(self, stock_df, mult = 1):
+                return {'volsum': mult*sum(stock_df[stock]['volume'] for stock in stock_df)}
+            
+            @Indicators.SingleIndicator
+            def bollingers(self, df, lookback = 20, n_std = 3):
+                
+                tp = (df['close'] + df['low'] + df['high']) / 3     # Calculate Typical Price
+                matp = tp.rolling(lookback).mean()                  # Calculate Moving Average of Typical Price
+                std = tp.rolling(lookback).std()                    # Calculate Standard Deviation
+                
+                upper = matp + n_std * std                          # Calculate Upper Bollinger Band
+                lower = matp - n_std * std                          # Calculate Lower Bollinger Band
+                return {'upper_bollinger': upper, 'lower_bollinger': lower}
+        ```
+        '''
+        self._NULL_STOCK = '.'
         self.params = self.defaults
         if isinstance(stockdata, str):
             stockdata = StockData(data_path=stockdata)
@@ -44,11 +124,11 @@ class Indicators:
 
     @property
     def _singles(self):
-        return sorted(sum((v for k,v in self._funcn_to_indicator_map.items() if self._is_single(k)), start = []))
+        return sorted(sum((v for k,v in self._funcn_to_indicator_map.items() if not self._is_multi(k)), start = []))
     
     @property
     def _multis(self):
-        return sorted(sum((v for k,v in self._funcn_to_indicator_map.items() if not self._is_single(k)), start = []))
+        return sorted(sum((v for k,v in self._funcn_to_indicator_map.items() if self._is_multi(k)), start = []))
     
     @property
     def indicator_groups(self):
@@ -58,9 +138,10 @@ class Indicators:
     def _indicator_functions(self):
         # TODO: filter by only functions
         cls = type(self)
-
+    
         return {k: v for k, v in getmembers(cls)
-                if callable(v) and (hasattr(getattr(cls, k), 'SingleIndicator') or hasattr(getattr(cls, k), 'MultiIndicator')) and not k.startswith('__')} 
+                if callable(v) 
+                and any(map(lambda x: hasattr(getattr(cls, k), x),  ['SingleIndicator', 'MultiIndicator']))} 
     @property
     def defaults(self):
         
@@ -87,15 +168,20 @@ class Indicators:
         self._add_parameters(params)
 
         # params maps function name to parameters
-
-        return {indicator: {stock: val for stock, val in  self._get_cached(funcn, params[funcn], indicator).items()} for funcn, indicators in self._funcn_to_indicator_map.items() for indicator in indicators}
+        vals = {}
+        for funcn, indicators in self._funcn_to_indicator_map.items():
+            for indicator in indicators:
+                cached = self._get_cached(funcn, params[funcn], indicator).items()
+                vals[indicator] = cached.get(self._NULL_STOCK, cached)
+               
+        return vals
 
     #---------------[Private Methods]-----------------#
 
-    def _is_single(self, indicator_function_name):
+    def _is_multi(self, indicator_function_name):
         if indicator_function_name not in self._indicator_functions:
             raise ValueError(f'Invalid indicator function name: {indicator_function_name}')
-        return hasattr(getattr(type(self), indicator_function_name), 'SingleIndicator')
+        return hasattr(getattr(type(self), indicator_function_name), 'MultiIndicator')
 
     def _fill_in_params(self, params):
         curr_params = {k: {k1:v1 for k1, v1 in v.items()} for k,v in self.params.items()}
@@ -141,7 +227,7 @@ class Indicators:
             return
         
         to_cache = dict()
-        for stock, data in (self._data.items() if self._is_single(func_name) else [('.', self._data)]):
+        for stock, data in (self._data.items() if self._is_multi(func_name) else [(self._NULL_STOCK, self._data)]):
 
             out = func(self, data, **params)
             if not isinstance(out, dict):
@@ -162,10 +248,8 @@ class Indicators:
         
         funcn_to_params = self._fill_in_params(funcn_to_params)
 
-
         combinations = defaultdict(list)
 
-        # with tqdm(total=len_indicator_comb, desc="Precomputing indicator variants.") as bar:
         for indicator, paramters in funcn_to_params.items():
             
             param, val = zip(*paramters.items())
@@ -178,7 +262,6 @@ class Indicators:
             for perm in permutations_dicts:                
                 self._add_indicator(indicator, self._indicator_functions[indicator], perm)
                 combinations[indicator].append(perm)
-                # bar.update(1)
 
         # get every combination of different indicators
         every_combination =  [dict(zip(combinations.keys(), c)) for c in product(*combinations.values())]
@@ -194,12 +277,11 @@ class Indicators:
         self._add_parameters(params)
 
         # params maps function name to parameters
-
         self._indicators_iterations = {indicator: array(list(self._get_cached(funcn, params[funcn], indicator).values())) for funcn, indicators in self._funcn_to_indicator_map.items() for indicator in indicators}
 
         return self.__iter__()
     
-        #---------[CACHE]---------#
+    #---------[CACHE]---------#
     def _hashable(self, function_name, params):
         return (function_name, tuple(sorted(params.items())))
 
@@ -219,15 +301,15 @@ class Indicators:
         key = self._hashable(function_name, params)
         return self._cache[key][indicator]
 
-        #---------[/CACHE]---------#       
+    #---------[/CACHE]---------#       
     
     #---------------[Internal Methods]-----------------#
     def __iter__(self):
-        self._iterate_indicators = {indicator: {stock: None for stock in self._stocks} for indicator in self._singles}
-        self._iterate_indicators.update({indicator: None for indicator in self._multis})
+        self._iterate_indicators = {indicator: {stock: None for stock in self._stocks} for indicator in self._multis}
+        self._iterate_indicators.update({indicator: None for indicator in self._singles})
 
-        self._indexes_single = list(product(self._singles, range(len(self._stocks))))
-        self._indexes_multi = self._multis
+        self._indexes_multis = list(product(self._multis, range(len(self._stocks))))
+        self._indexes_singles = self._singles
         self._i = 1
         return self
 
@@ -235,15 +317,15 @@ class Indicators:
         if self._i > len(self):
             self._indicators_iterations = None
             self._iterate_indicators = None
-            self._indexes_single = None
-            self._indexes_multi = None
+            self._indexes_multis = None
+            self._indexes_singles = None
             self._i = None
             raise StopIteration(f'Index {self._i } out of range.')
 
-        for indicator, s in self._indexes_single: 
+        for indicator, s in self._indexes_multis: 
             self._iterate_indicators[indicator][self._stocks[s]] = self._indicators_iterations[indicator][s, :self._i]
 
-        for indicator in self._indexes_multi:
+        for indicator in self._indexes_singles:
             self._iterate_indicators[indicator] = self._indicators_iterations[indicator][0, :self._i]
         
         self._i += 1
