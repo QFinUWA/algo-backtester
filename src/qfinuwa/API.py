@@ -22,32 +22,54 @@ except NameError:
 NOTE:  The data is derived from the Securities Information Processor (SIP) market-aggregated data.
 '''
 class API:
-    
-    def __init__(self, api_key_path: str='API_key.txt', data_folder: str=None):
 
-        self.data_folder = data_folder
+    #---------------[Public Methods]-----------------#    
+    @classmethod
+    def fetch_anonymous(cls, data_folder: str = '', links: str=None) -> None:
+        '''
+        Fetches the anonymised data from a google drive provided by QFIN. The data is stored in the folder specified by `data_folder`.
 
+        ### Parameters
+        - ``links`` (``str``): The path to a file containing the file ids of the data. If not provided, the default file ids will be used.
+        - ``data_folder`` (``str``): The path to the folder where the data will be stored.
+
+        ### Returns
+        ``None``
+        '''
         if not os.path.exists(data_folder):
             os.mkdir(data_folder)
 
+        file_ids = ['15SdLhjtojM72tHitPN0nnjxo08d1RPuK', '134dhKv9JZAQpp1ZR-F8eukS0W1QnU35e', '1G8tUL2z7zHwRnHWR3rivmWwswsnhohDa']
+
+        if links is not None:
+            with open(links, 'r') as f:
+                file_ids = f.readlines()
+        
+        with ThreadPool() as p:
+            p.starmap(cls._download_file_from_google_drive, [(fileid, data_folder) for fileid in file_ids])
+    
+
+    @classmethod
+    def fetch_stocks(cls, stocks: str | list, api_key_path: str, data_folder: str) -> None:
+        '''
+        Fetches the data from the SIP market-aggregated data. The data is provided by the SEC. An API key is required. The data is stored in the folder specified by `data_folder`.
+
+        ### Parameters
+        - ``stocks`` (``str``): The ticker(s) of the stock(s) to be downloaded. If multiple stocks are required, a list of tickers can be provided.
+        - ``api_key_path`` (``str``): The path to the file containing the API key.
+
+        ### Returns
+        ``None``
+        '''
+    
         if not os.path.exists(api_key_path):
             raise ValueError(f'{api_key_path} does not exist.')
 
         with open(api_key_path, 'r') as f:
-            self.apikey = f.readline()
+            apikey = f.readline()
 
-    #---------------[Public Methods]-----------------#    
-    def fetch_anonymous(self, filepath: str=None) -> None:
-        file_ids = ['15SdLhjtojM72tHitPN0nnjxo08d1RPuK', '134dhKv9JZAQpp1ZR-F8eukS0W1QnU35e', '1G8tUL2z7zHwRnHWR3rivmWwswsnhohDa']
-
-        if filepath is not None:
-            with open(filepath, 'r') as f:
-                file_ids = f.readlines()
-        
-        with ThreadPool() as p:
-            p.map(self._download_file_from_google_drive, file_ids)
-        
-    def fetch_stocks(self, stocks: str) -> None:
+        if not os.path.exists(data_folder):
+            os.mkdir(data_folder)
 
         if isinstance(stocks, str):
             stocks = [stocks]
@@ -61,17 +83,17 @@ class API:
         with tqdm(stocks) as pbar:
             for stock in pbar:
 
-                urls = [self._get_params(stock, year, month)
+                urls = [cls._get_params(stock, year, month, apikey)
                         for year, month in product(years, months)][:-3]
 
                 n_threads = min(cpu_count(), len(urls))
 
                 pbar.set_description(f'> Fetching {stock} ({n_threads} threads)')
 
-                if not self._is_cached(stock):
+                if not cls._is_cached(stock):
 
                     with ThreadPool(n_threads) as p:
-                        results = p.map(self._process_request, urls)
+                        results = p.map(cls._process_request, urls)
                     # pbar.set_description(f'> Processing {stock}')
                     df = pd.concat(results, axis=0, ignore_index=True)
                     df['time'] = pd.to_datetime(df['time'])
@@ -79,21 +101,17 @@ class API:
                     df.sort_values(
                         by='time', inplace=True)
                     
-                    
-                    # df.to_csv(self.to_path(stock), index=False)
-                    # df = df.drop(columns=['open', 'high', 'low']).rename(
-                    #     columns={"close": "price"})
-                    # df = df[24*60:-24*60]
                     pbar.set_description(f'> Saving {stock} ({len(df)} rows)')
-                    # df.to_csv(self.to_path(stock + '_raw'), index=False)
-                    stock_df.append((self._to_path(stock), df))
+                    # df.to_csv(cls.to_path(stock + '_raw'), index=False)
+                    stock_df.append((cls._to_path(stock), df))
 
                 pbar.update(1)
                 pbar.set_description(f'> Done Fetching') # hacky way to set last description but hey it works
-        self._allign_data(stock_df)
+        cls._allign_data(stock_df)
 
     #---------------[Private Methods]-----------------# 
-    def _download_file_from_google_drive(self, id: str) -> None:
+    @classmethod
+    def _download_file_from_google_drive(cls, id: str, data_folder: str) -> None:
         URL = "https://docs.google.com/uc?export=download"
 
         session = requests.Session()
@@ -118,10 +136,11 @@ class API:
                     f.write(chunk)
 
             with zipfile.ZipFile(f) as z:
-                z.extractall(path=self.data_folder)
+                z.extractall(path=data_folder)
 
 
-    def _get_params(self, stock: str, year: int, month: int) -> str:
+    @classmethod
+    def _get_params(cls, stock: str, year: int, month: int, api_key: str) -> str:
 
         params = {
             'function': 'TIME_SERIES_INTRADAY_EXTENDED',
@@ -130,19 +149,22 @@ class API:
             'datatype': 'csv',
             'adjusted': 'true',
             "slice": f'year{year}month{month}',
-            'apikey': self.apikey
+            'apikey': api_key,
         }
         # print(
         #     f'https://www.alphavantage.co/query?{urlparse.urlencode(params)}')
         return f'https://www.alphavantage.co/query?{urlparse.urlencode(params)}'
 
-    def _to_path(self, stock: str) -> str:
-        return os.path.join(self.data_folder, f"{stock}.csv")
+    @classmethod
+    def _to_path(cls, stock: str) -> str:
+        return os.path.join(cls.data_folder, f"{stock}.csv")
 
-    def _is_cached(self, stock: str) -> bool:
-        return os.path.exists(self._to_path(stock))
+    @classmethod
+    def _is_cached(cls, stock: str) -> bool:
+        return os.path.exists(cls._to_path(stock))
 
-    def _process_request(self, url_request: str) -> pd.DataFrame:
+    @classmethod
+    def _process_request(cls, url_request: str) -> pd.DataFrame:
         # print(f'processed {url}')
         df = pd.read_csv(url_request)
 
@@ -152,7 +174,8 @@ class API:
         # df = df.drop(columns=['open', 'high', 'low'])
         return df
 
-    def _allign_data(self, dfs: list) -> None:
+    @classmethod
+    def _allign_data(cls, dfs: list) -> None:
 
         if len(dfs)==0:
             return

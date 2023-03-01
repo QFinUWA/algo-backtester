@@ -4,7 +4,7 @@ from inspect import signature, getmembers, Parameter
 from itertools import product
 from collections import defaultdict
 from numpy import array
-from .opt.stockdata import StockData
+from .opt._stockdata import StockData
 
 class Indicators:
 

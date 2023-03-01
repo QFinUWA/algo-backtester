@@ -1,9 +1,9 @@
 
 from itertools import islice, product
-from .opt.portfolio import Portfolio
-from .opt.stockdata import StockData
+from .opt._portfolio import Portfolio
+from .opt._stockdata import StockData
 import random
-from .opt.result import SingleRunResult, MultiRunResult, ParameterSweepResult
+from .opt._result import SingleRunResult, MultiRunResult, ParameterSweepResult
 from .algorithm import Algorithm
 from .indicators import Indicators
 
@@ -24,24 +24,61 @@ except NameError:
 
 class Backtester:
 
-    def __init__(self, stocks, strategy, pindicators, data=r'\data', days='all', cash=1000, fee=0.001, seed=None):
+    '''
+    # Backteser
+    A class for running a strategy on historical data. Once initialised, the data is precompiled
+    for iterating. The parameters can be updated using the ``update_x`` and ``set_x`` functions.
+    The strategy is run on the data by calling the either the ``run`` or ``run_grid_search`` method. 
+    
+    ## Parameters
+    - ``stocks`` (``list``): A list of stock to run the strategy on.
+    - ``strategy_class`` (``Algorithm``): The strategy to run.
+    - ``indicator_class`` (``Indicators``): The indicators to use in the strategy.
+    - ``data`` (``str``): The path to the data folder.
+    - ``days`` (``int`` or ``str``): The number of days to run the strategy on. 
+    - ``cash`` (``float``): The starting cash balance.
+    - ``fee`` (``float``): The fee to pay on each transaction.
+
+    ## Properties
+    - ``algorithm_params`` (``dict``): The parameters of the strategy.
+    - ``indicator_params`` (``dict``): The parameters of the indicators.
+    - ``fee`` (``float``): The fee to pay on each transaction.
+    - ``stocks`` (``list``): The stocks to run the strategy on.
+    - ``days`` (``int``): The number of days to run the strategy on.
+    - ``starting_balance`` (``float``): The starting cash balance.
+
+    ## Returns
+    ``None``
+
+    ## Example
+    ```python
+    from qfinuwa import Backtester
+
+    backtester = Backtester(['AAPL', 'GOOG'], data=r'\data', days=90, fee=0.01)
+    ```
+
+    '''
+    def __init__(self, stocks: list, 
+            strategy_class: Algorithm, indicator_class: Indicators, 
+            data: str=r'\data', days: int | str = 'all', 
+            cash: float=1000, fee: float=0.001):
 
         # raise execption if strategy is not a subclass of Strategy
-        if not issubclass(strategy, Algorithm):
+        if not issubclass(strategy_class, Algorithm):
             raise ValueError('Strategy must be a subclass of Algorithm')   
-        self._strategy = strategy
+        self._strategy = strategy_class
 
         self._data = StockData(data, stocks=stocks, verbose=True)
         self._precomp_prices = self._data.prices
 
         # raise expection if indiators is not a subclass of Indicators
-        if not issubclass(pindicators, Indicators):
+        if not issubclass(indicator_class, Indicators):
             raise ValueError('Indicators must be a subclass of Indicators')
         
-        self._indicators = pindicators(self._data)
+        self._indicators = indicator_class(self._data)
 
         self._fee = fee
-        self._starting_cash = cash
+        self._starting_balance = cash
         
         self._algorithm_params = dict()
 
@@ -68,7 +105,26 @@ class Backtester:
         x.update(self._algorithm_params)  
         return x
     
+    @property
+    def days(self):
+        return self._days
+    
+    @property
+    def starting_balance(self):
+        return self._starting_balance
+    
     #---------------[Public Methods]-----------------#
+    '''
+    Sets the number of days to run the strategy on.
+    If days is a string, it must be ``'all'`` and the strategy will be run on all available data.
+    If days is an integer, ``n``, it must be a positive integer and the strategy will be run on the last ``n`` days.
+
+    ## Parameters
+    - ``days`` (``int`` or ``str``): The number of days to run the strategy on.
+
+    ## Returns
+    ``None``
+    '''
     def set_days(self, days: int | str) -> None:
         if isinstance(days, str) and days != 'all':
             raise ValueError('days must be an integer or "all"')
@@ -78,12 +134,54 @@ class Backtester:
         
         self._days = days
 
+    '''
+    Sets the starting balance of the strategy.
+
+    ## Parameters
+    - ``balance`` (``float``): The starting cash balance.
+
+    ## Returns
+    ``None``
+
+    '''
+    def set_starting_balance(self, balance: float) -> None:
+        if balance < 0:
+            raise ValueError('balance must be a positive number')
+        self._starting_balance = balance
+
+    '''
+    Updates the stored indicators.
+
+    ## Parameters
+    - ``indicator_class`` (``Indicator``): subclass of Indicators
+
+    ## Returns
+    ``None``
+    '''
     def update_indicators(self, indicator_class: Indicators) -> None:
         self._indicators = indicator_class(self._data)
 
+    '''
+    Sets the stored indicators.
+
+    ## Parameters
+    - ``indicator_class`` (``Indicator``): subclass of Indicators
+
+    ## Returns
+    ``None``
+    '''
     def set_indicator_params(self, params: dict) -> None:
         self._indicators._update_parameters(params)
 
+    '''
+    Updates the stored strategy.
+
+    ## Parameters
+    - ``strategy_class`` (``Algorithm``): subclass of Algorithm
+
+    ## Returns
+    ``None``
+    '''
     def update_strategy(self, strategy_class: Algorithm) -> None:
         self._strategy = strategy_class
 
@@ -91,6 +189,15 @@ class Backtester:
             print('! Algorithm parameters changed: resetting to defaults !')
             self.algorithm_params = strategy_class.defaults()
 
+    '''
+    Sets the stored strategy.
+
+    ## Parameters
+    - ``strategy_class`` (``Algorithm``): subclass of Algorithm
+
+    ## Returns
+    ``None``
+    '''
     def set_strategy_params(self, params: dict) -> None:
 
         if not self._strategy:
@@ -98,9 +205,18 @@ class Backtester:
         self._algorithm_params.update({k:v for k,v in params.items() if k in self._strategy.defaults()})
 
     '''
-    Backtests the stored strategy. 
-    '''
+    Runs the strategy on a set of hyperparameters.
 
+    ## Parameters
+    - ``algorithm_params`` (``dict``): The parameters of the strategy.
+    - ``indicator_params`` (``dict``): The parameters of the indicators.
+    - ``progressbar`` (``bool``): Whether to show a progress bar.
+    - ``cv`` (``int``): The number of cross-validation folds to use.
+    - ``seed`` (``int``): The seed to use for the random number generator.
+
+    ## Returns
+    result (``MultiRunResult``): The results of the strategy.
+    '''
     def run(self, algorithm_params: dict = None, indicator_params: dict = None, progressbar: bool=True, cv: int = 1, seed: int = None) -> MultiRunResult:
 
         if not self._strategy:
@@ -133,7 +249,7 @@ class Backtester:
 
         desc = f'> Running backtest over {cv} sample{"s" if cv > 1 else ""} of {self._days} day{"s" if cv > 1 else ""}'
         for start, end in (tqdm(random_periods, desc = desc) if progressbar and cv > 1 else random_periods):
-            portfolio = Portfolio(self.stocks, self._starting_cash, self._fee)
+            portfolio = Portfolio(self.stocks, self._starting_balance, self._fee)
             if algorithm_params:
                 algorithm = self._strategy(*tuple(), **algorithm_params)
             else:
@@ -151,7 +267,18 @@ class Backtester:
 
         return MultiRunResult((algorithm_params, indicator_params), results)
     
-    
+    '''
+    Runs a grid search over a set of hyperparameters.
+
+    ## Parameters
+    - ``strategy_params`` (``dict``): The parameters of the strategy.
+    - ``indicator_params`` (``dict``): The parameters of the indicators.
+    - ``cv`` (``int``): The number of cross-validation folds to use.
+    - ``seed`` (``int``): The seed to use for the random number generator.
+
+    ## Returns
+    result (``ParameterSweepResult``): The results of the strategy.
+    '''
     def run_grid_search(self, strategy_params: dict = None, indicator_params: dict = None, cv: int = 1, seed: int =None) -> ParameterSweepResult:
         # get all combinations of algorithm paramters
         # ----[strategy params]----
