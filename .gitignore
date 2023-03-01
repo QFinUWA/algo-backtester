@@ -134,6 +134,7 @@ dmypy.json
 # data
 *.csv
 *.hdf5
+*.html
 
 # temp files
 test*
