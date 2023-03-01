@@ -3,15 +3,17 @@ import bokeh
 import os 
 import pandas as pd
 import numpy as np
+from .opt._result import SingleRunResult
 
 class Plotting:
 
+    #---------------[Class Methods]-----------------#
     @classmethod
-    def colours(cls, n):
+    def colours(cls, n: int) -> list:
         return bokeh.palettes.Category10[n]
     
     @classmethod
-    def plot_result(cls, result, stocks=list(), transactions_on = 'portfolio', normalise_stocks=True, filename = None):
+    def plot_result(cls, result: SingleRunResult, stocks: list=[], transactions_on: str = 'portfolio', normalise_stocks: bool =True, filename: str = None) -> None:
         p = bokeh.plotting.figure(x_axis_type='linear', title=f"Portfolio Value over Time - {result._datetimeindex.iloc[0]} --> {result._datetimeindex.iloc[-1]}", width=1000, height=400)
         p.grid.grid_line_alpha = 0.3
         p.xaxis.axis_label = 'Date'
@@ -52,9 +54,8 @@ class Plotting:
             bokeh.plotting.output_file(filename)
 
     @classmethod
-    def plot_indicators(cls, indicators, data_folder, stocks = list(), filename=None):
+    def plot_indicators(cls, indicators: str, data_folder: str, stocks: list = [], filename: bool=None) -> None:
         
-
         p = bokeh.plotting.figure(x_axis_type="linear", title="Portfolio Value over Time", width=1000, height=400)
         p.grid.grid_line_alpha = 0.3
         p.xaxis.axis_label = 'Time'

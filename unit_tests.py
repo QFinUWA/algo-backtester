@@ -68,7 +68,7 @@ class TestStringMethods(unittest.TestCase):
 
         self.assertDictEqual(indicators._cache, {('b', (('bp1', 1), ('bp2', 2))): {'b1': {'AAPL': [2, 3, 4], 'GOOG': [5, 6, 7]}, 'b2': {'AAPL': [3, 4, 5], 'GOOG': [6, 7, 8]}}})
 
-        indicators.add_parameters({'b': {'bp1': 0, 'bp2': 0}})
+        indicators._add_parameters({'b': {'bp1': 0, 'bp2': 0}})
 
         self.assertDictEqual(indicators._cache, {('b', (('bp1', 1), ('bp2', 2))): {'b1': {'AAPL': [2, 3, 4], 'GOOG': [5, 6, 7]}, 'b2': {'AAPL': [3, 4, 5], 'GOOG': [6, 7, 8]}}, ('b', (('bp1', 0), ('bp2', 0))): {'b1': {'AAPL': [1, 2, 3], 'GOOG': [4, 5, 6]}, 'b2': {'AAPL': [1, 2, 3], 'GOOG': [4, 5, 6]}}})
 
@@ -88,7 +88,7 @@ class TestStringMethods(unittest.TestCase):
 
         indicators = ExtendedIndicators(self.stock_data)
 
-        indicators.update_parameters({'b': {'bp1': 0, 'bp2': 0}, 'a': {'ap1': 0}})
+        indicators._update_parameters({'b': {'bp1': 0, 'bp2': 0}, 'a': {'ap1': 0}})
 
         # check cache updated
         self.assertDictEqual(indicators._cache, {('b', (('bp1', 1), ('bp2', 2))): {'b1': {'AAPL': [2, 3, 4], 'GOOG': [5, 6, 7]}, 'b2': {'AAPL': [3, 4, 5], 'GOOG': [6, 7, 8]}}, ('b', (('bp1', 0), ('bp2', 0))): {'b1': {'AAPL': [1, 2, 3], 'GOOG': [4, 5, 6]}, 'b2': {'AAPL': [1, 2, 3], 'GOOG': [4, 5, 6]}}, ('a', (('ap1', 0),)): {'a1': {'AAPL': [0, 0, 0], 'GOOG': [0, 0, 0]}}, ('a', (('ap1', 1),)): {'a1': {'AAPL': [1, 1, 1], 'GOOG': [1, 1, 1]}}})
@@ -97,19 +97,19 @@ class TestStringMethods(unittest.TestCase):
 
 
                 # check cache updated
-        indicators.update_parameters({'b': {'bp1': -1}})
+        indicators._update_parameters({'b': {'bp1': -1}})
 
         self.assertDictEqual(indicators._cache, {('b', (('bp1', 1), ('bp2', 2))): {'b1': {'AAPL': [2, 3, 4], 'GOOG': [5, 6, 7]}, 'b2': {'AAPL': [3, 4, 5], 'GOOG': [6, 7, 8]}}, ('b', (('bp1', 0), ('bp2', 0))): {'b1': {'AAPL': [1, 2, 3], 'GOOG': [4, 5, 6]}, 'b2': {'AAPL': [1, 2, 3], 'GOOG': [4, 5, 6]}}, ('a', (('ap1', 0),)): {'a1': {'AAPL': [0, 0, 0], 'GOOG': [0, 0, 0]}}, ('a', (('ap1', 1),)): {'a1': {'AAPL': [1, 1, 1], 'GOOG': [1, 1, 1]}}, ('b', (('bp1', -1), ('bp2', 0))): {'b1': {'AAPL': [0, 1, 2], 'GOOG': [3, 4, 5]}, 'b2': {'AAPL': [1, 2, 3], 'GOOG': [4, 5, 6]}}})
 
         # check params updated
         self.assertDictEqual(indicators.params, {'b': {'bp1': -1, 'bp2': 0}, 'a': {'ap1': 0}})
 
-        indicators.update_parameters({})
+        indicators._update_parameters({})
 
         self.assertDictEqual(indicators.params, {'b': {'bp1': -1, 'bp2': 0}, 'a': {'ap1': 0}})
 
-        self.assertRaises(ValueError, indicators.update_parameters, {'b': {'bp1': 0, 'bp2': 0}, 'a': {'ap1': 0}, 'c': {'cp1': 0}})
-        self.assertRaises(ValueError, indicators.update_parameters, {'b': {'bp1': 0, 'bp2': 0}, 'a': {'bp1': 0}})
+        self.assertRaises(ValueError, indicators._update_parameters, {'b': {'bp1': 0, 'bp2': 0}, 'a': {'ap1': 0}, 'c': {'cp1': 0}})
+        self.assertRaises(ValueError, indicators._update_parameters, {'b': {'bp1': 0, 'bp2': 0}, 'a': {'bp1': 0}})
 
     def test_permutations(self):
         
@@ -162,7 +162,7 @@ class TestStringMethods(unittest.TestCase):
         # {'a': {'ap1': -1}, 'b': {'bp1': 1, 'bp2': 3}}, 
         # {'a': {'ap1': -1}, 'b': {'bp1': 1, 'bp2': 3}}]
 
-        res = indicators.get_permutations({})
+        res = indicators._get_permutations({})
         self.assertListEqual(res, [indicators.params])
 
     # def test_iterate(self):
@@ -198,6 +198,6 @@ class TestStringMethods(unittest.TestCase):
     #     self.assertDictEqual(next(it), {'AAPL': {'a1': [10,10], 'b1': [11,12], 'b2': [11,12]}, 'GOOG': {'a1': [10,10], 'b1': [14,15], 'b2': [14,15]}})
     #     self.assertDictEqual(next(it), {'AAPL': {'a1': [10,10,10], 'b1': [11,12,13], 'b2': [11,12,13]}, 'GOOG': {'a1': [10,10,10], 'b1': [14,15,16], 'b2': [14,15,16]}})
 
-        it = indicators.iterate_params({'a': {'ap1': -1 }}) # TODO:
+        it = indicators._iterate_params({'a': {'ap1': -1 }}) # TODO:
 if __name__ == '__main__':
     unittest.main()

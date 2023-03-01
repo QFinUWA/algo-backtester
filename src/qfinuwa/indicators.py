@@ -1,9 +1,9 @@
 
 from functools import wraps
-import inspect
+from inspect import signature, getmembers, Parameter
 from itertools import product
 from collections import defaultdict
-import numpy as np
+from numpy import array
 from .opt.stockdata import StockData
 
 class Indicators:
@@ -11,34 +11,33 @@ class Indicators:
     def __init__(self, stockdata='data'):
 
         self.params = self.defaults
-        # self._stockdata = stockdata
         if isinstance(stockdata, str):
             stockdata = StockData(data_path=stockdata)
 
         self._data = stockdata._stock_df
         self._L = len(stockdata)
-        # self._L = 3
-
         self._cache = dict()
         self._funcn_to_indicator_map = dict()
-        # for func_name, func in self._indicator_functions.items():
-        self.add_parameters(self.params)
+        self._add_parameters(self.params)
 
-        # TODO: optimsie by caching the precomputed indicator values 
-
-    #----[ Properties ]--------------------------------------------------------
-    # @property
-    def indicator_values(self, params=None):
-        if params is None:
-            params = self.params
-
-        params = self._fill_in_params(params)
-        self.add_parameters(params)
-
-        # params maps function name to parameters
-
-        return {indicator: {stock: val for stock, val in  self._get_cached(funcn, params[funcn], indicator).items()} for funcn, indicators in self._funcn_to_indicator_map.items() for indicator in indicators}
-
+    #---------------[Class Methods]-----------------#
+    @classmethod
+    def SingleIndicator(cls, func):
+        @wraps(func)
+        def wrapper_func(*_args, **_kwargs):
+            return func(*_args, **_kwargs)
+        wrapper_func.SingleIndicator = True
+        return wrapper_func
+    
+    @classmethod
+    def MultiIndicator(cls, func):
+        @wraps(func)
+        def wrapper_func(*_args, **_kwargs):
+            return func(*_args, **_kwargs)
+        wrapper_func.MultiIndicator = True
+        return wrapper_func
+    
+    #---------------[Properties]-----------------#
     @property
     def indicators(self):
         return sorted(sum((v for v in self._funcn_to_indicator_map.values()), start = []))
@@ -60,25 +59,16 @@ class Indicators:
         # TODO: filter by only functions
         cls = type(self)
 
-        return {k: v for k, v in inspect.getmembers(cls)
-                if callable(v) and (hasattr(getattr(cls, k), 'SingleIndicator') or hasattr(getattr(cls, k), 'MultiIndicator')) and not k.startswith('__')}
-
-
-    def _is_single(self, indicator_function_name):
-        if indicator_function_name not in self._indicator_functions:
-            raise ValueError(f'Invalid indicator function name: {indicator_function_name}')
-        return hasattr(getattr(type(self), indicator_function_name), 'SingleIndicator')
-
-
+        return {k: v for k, v in getmembers(cls)
+                if callable(v) and (hasattr(getattr(cls, k), 'SingleIndicator') or hasattr(getattr(cls, k), 'MultiIndicator')) and not k.startswith('__')} 
     @property
     def defaults(self):
         
         def get_defaults(func): 
-            signature = inspect.signature(func)
             return {
                 k: v.default
-                for k, v in signature.parameters.items()
-                if v.default is not inspect.Parameter.empty
+                for k, v in signature(func).parameters.items()
+                if v.default is not Parameter.empty
             }
        
         return {name: get_defaults(function) for name, function in self._indicator_functions.items()}
@@ -87,23 +77,25 @@ class Indicators:
     def _stocks(self):
         return list(self._data.keys())
 
-    @classmethod
-    def SingleIndicator(cls, func):
-        @wraps(func)
-        def wrapper_func(*_args, **_kwargs):
-            return func(*_args, **_kwargs)
-        wrapper_func.SingleIndicator = True
-        return wrapper_func
+    #---------------[Public Methods]-----------------#
     
-    @classmethod
-    def MultiIndicator(cls, func):
-        @wraps(func)
-        def wrapper_func(*_args, **_kwargs):
-            return func(*_args, **_kwargs)
-        wrapper_func.MultiIndicator = True
-        return wrapper_func
+    def indicator_values(self, params: dict=None) -> dict:
+        if params is None:
+            params = self.params
 
-    # ----[/Properties]--------------------------------------------------------
+        params = self._fill_in_params(params)
+        self._add_parameters(params)
+
+        # params maps function name to parameters
+
+        return {indicator: {stock: val for stock, val in  self._get_cached(funcn, params[funcn], indicator).items()} for funcn, indicators in self._funcn_to_indicator_map.items() for indicator in indicators}
+
+    #---------------[Private Methods]-----------------#
+
+    def _is_single(self, indicator_function_name):
+        if indicator_function_name not in self._indicator_functions:
+            raise ValueError(f'Invalid indicator function name: {indicator_function_name}')
+        return hasattr(getattr(type(self), indicator_function_name), 'SingleIndicator')
 
     def _fill_in_params(self, params):
         curr_params = {k: {k1:v1 for k1, v1 in v.items()} for k,v in self.params.items()}
@@ -111,13 +103,13 @@ class Indicators:
             curr_params[indicator].update(params[indicator])
         return curr_params
 
-    def update_parameters(self, params):
+    def _update_parameters(self, params):
 
         self._raise_invalid_params(params)
             
         self.params = self._fill_in_params(params)
         
-        self.add_parameters(self.params)
+        self._add_parameters(self.params)
     
     def _raise_invalid_params(self, params):
         defaults = self.defaults
@@ -129,7 +121,7 @@ class Indicators:
             if f_params.keys() - defaults[func_name].keys():
                 raise ValueError(f'Indicator(s) not found in {func_name}: {f_params.keys() - defaults[func_name].keys()}')
 
-    def add_parameters(self, params):
+    def _add_parameters(self, params):
 
         self._raise_invalid_params(params)
 
@@ -164,31 +156,7 @@ class Indicators:
 
         self._cache_indicator(func_name, params, to_cache)
 
-    
-    #---------[CACHE]---------#
-    def _hashable(self, function_name, params):
-        return (function_name, tuple(sorted(params.items())))
-
-    def _cache_indicator(self, function_name, params, values):
-        key = self._hashable(function_name, params)
-        self._cache[key] = values
-        return
-
-    def _is_cached(self, function_name, params):
-        return self._hashable(function_name, params) in self._cache
-
-    def _get_cached(self, function_name, params, indicator):
-
-        if not self._is_cached(function_name, params):
-            return None
-        
-        key = self._hashable(function_name, params)
-        return self._cache[key][indicator]
-
-    #---------[/CACHE]---------#       
-
-
-    def get_permutations(self, funcn_to_params):
+    def _get_permutations(self, funcn_to_params):
 
         self._raise_invalid_params(funcn_to_params)
         
@@ -217,20 +185,43 @@ class Indicators:
 
         return every_combination
 
-    def iterate_params(self, params=None):
+    def _iterate_params(self, params=None):
 
         if params is None:
             params = self.params
 
         params = self._fill_in_params(params)
-        self.add_parameters(params)
+        self._add_parameters(params)
 
         # params maps function name to parameters
 
-        self._indicators_iterations = {indicator: np.array(list(self._get_cached(funcn, params[funcn], indicator).values())) for funcn, indicators in self._funcn_to_indicator_map.items() for indicator in indicators}
+        self._indicators_iterations = {indicator: array(list(self._get_cached(funcn, params[funcn], indicator).values())) for funcn, indicators in self._funcn_to_indicator_map.items() for indicator in indicators}
 
         return self.__iter__()
     
+        #---------[CACHE]---------#
+    def _hashable(self, function_name, params):
+        return (function_name, tuple(sorted(params.items())))
+
+    def _cache_indicator(self, function_name, params, values):
+        key = self._hashable(function_name, params)
+        self._cache[key] = values
+        return
+
+    def _is_cached(self, function_name, params):
+        return self._hashable(function_name, params) in self._cache
+
+    def _get_cached(self, function_name, params, indicator):
+
+        if not self._is_cached(function_name, params):
+            return None
+        
+        key = self._hashable(function_name, params)
+        return self._cache[key][indicator]
+
+        #---------[/CACHE]---------#       
+    
+    #---------------[Internal Methods]-----------------#
     def __iter__(self):
         self._iterate_indicators = {indicator: {stock: None for stock in self._stocks} for indicator in self._singles}
         self._iterate_indicators.update({indicator: None for indicator in self._multis})

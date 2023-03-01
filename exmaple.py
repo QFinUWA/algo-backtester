@@ -43,10 +43,10 @@ if __name__ == "__main__":
     backtester = Backtester( ['AAPL', 'GOOG'],
                             data=data_folder_dir,  months=3, fee=0.01)
 
-    backtester.update_algorithm(RandomAlgorithm)
+    backtester.update_strategy(RandomAlgorithm)
 
 
-    backtester.set_algorithm_params({
+    backtester.set_strategy_params({
         "name": "Test",
     })
 
