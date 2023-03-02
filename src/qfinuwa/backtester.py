@@ -27,7 +27,8 @@ class Backtester:
     def __init__(self, stocks: list, 
             strategy_class: Strategy, indicator_class: Indicators, 
             data: str=r'\data', days: Union[int , str] = 'all', 
-            cash: float=1000, fee: float=0.001):
+            cash: float=1000, fee: float=0.001,
+            progressbar=True):
         '''
         # Backteser
         A class for running a strategy on historical data. Once initialised, the data is precompiled
@@ -42,6 +43,7 @@ class Backtester:
         - ``days`` (``int`` or ``str``): The number of days to run the strategy on. 
         - ``cash`` (``float``): The starting cash balance.
         - ``fee`` (``float``): The fee to pay on each transaction.
+        - ``progressbar`` (``bool``): Whether to show a progress bar when loading data.
 
         ## Properties
         - ``strategy_params`` (``dict``): The parameters of the strategy.
@@ -67,7 +69,7 @@ class Backtester:
             raise ValueError('Strategy must be a subclass of Strategy')   
         self._strategy = strategy_class
 
-        self._data = StockData(data, stocks=stocks, verbose=True)
+        self._data = StockData(data, stocks=stocks, verbose=progressbar)
         self._precomp_prices = self._data.prices
 
         # raise expection if indiators is not a subclass of Indicators

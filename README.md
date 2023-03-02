@@ -90,3 +90,15 @@ backtester = Backtester(['AAPL', 'GOOG'], strategy=MyCustomStrategy)
 ```
 
 TODO finish this section.
+
+### Additional Info
+
+## Time Scaling
+
+# Backtester.__init__
+
+![Time scaling of Backtester.__init__](https://github.com/qfinuwa/algo-backtester/blob/main/imgs/__init__.jpg?raw=true)
+
+# Backtester.run
+
+![Time scaling of Backtester.run](https://github.com/qfinuwa/algo-backtester/blob/main/imgs/run.jpg?raw=true)
