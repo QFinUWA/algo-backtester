@@ -95,6 +95,7 @@ class Indicators:
             stockdata = StockData(data_path=stockdata)
 
         self._data = stockdata._stock_df
+        self._index = stockdata._index
         self._L = len(stockdata)
         self._cache = dict()
         self._funcn_to_indicator_map = dict()
@@ -157,10 +158,22 @@ class Indicators:
     @property
     def _stocks(self):
         return list(self._data.keys())
+    
+    @property
+    def index(self):
+        return self._index
 
     #---------------[Public Methods]-----------------#
-    
     def indicator_values(self, params: dict=None) -> dict:
+        '''
+        Return a dictionary of indicator names and values.
+
+        ## Parameters
+        - ``params`` (``dict``): The parameters to evaluate the indicators with. If ``None``, the default parameters will be used.
+        
+        ## Returns
+        - ``dict``: A dictionary of indicator names and values.
+        '''
         if params is None:
             params = self.params
 
@@ -176,8 +189,16 @@ class Indicators:
                
         return vals
 
-    def update_parameters(self, params):
+    def update_parameters(self, params: dict) -> None:
+        '''
+        Update the parameters for the indicators.
 
+        ## Parameters
+        - ``params`` (``dict``): The parameters to evaluate the indicators with.
+
+        ## Returns
+        ``None``
+        '''
         self._raise_invalid_params(params)
             
         self.params = self._fill_in_params(params)

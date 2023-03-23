@@ -10,14 +10,15 @@ import zipfile
 import io
 from typing import Union
 
-try:
-    shell = get_ipython().__class__.__name__
-    if shell in ['ZMQInteractiveShell']:
-        from tqdm.notebook import tqdm as tqdm   # Jupyter notebook or qtconsole or Terminal running IPython  
-    else:
-         from tqdm import tqdm   
-except NameError:
-    from tqdm import tqdm      # Probably standard Python interpreter
+# try:
+#     shell = get_ipython().__class__.__name__
+#     if shell in ['ZMQInteractiveShell']:
+#         from tqdm.notebook import tqdm as tqdm   # Jupyter notebook or qtconsole or Terminal running IPython  
+#     else:
+#          from tqdm import tqdm   
+# except NameError:
+#     from tqdm import tqdm      # Probably standard Python interpreter
+from tqdm import tqdm 
 
 '''
 NOTE:  The data is derived from the Securities Information Processor (SIP) market-aggregated data.
@@ -82,7 +83,7 @@ class API:
         years = [2,1]
         months = range(12,0,-1)
         with tqdm(stocks) as pbar:
-            for stock in pbar:
+            for stock in stocks:
 
                 urls = [cls._get_params(stock, year, month, apikey)
                         for year, month in product(years, months)][:-3]
@@ -177,20 +178,21 @@ class API:
             return
 
         # go through all stocks and find last start date
-        start_date = max([pd.to_datetime(df.index.min()) for _, df in dfs])
+        start_date = [df.index.min() for _, df in dfs]
         # first end date
-        end_date = min([pd.to_datetime(df.index.max()) for __, df in dfs])
+        end_date = [df.index.max() for __, df in dfs]
         # crop dataframes
+        start_date, end_date = max(start_date),  min(end_date)
         with tqdm(dfs) as pbar:
             for filepath, df in dfs:          
                 pbar.set_description(f'> Alligning {filepath}')
-                cropped_df = df.loc[(df.index >= start_date) & (df.index <= end_date)]
 
                 # fill out with averages
-                filled_df = cropped_df.resample('T').mean().interpolate(method='time')
+                filled_df = df.resample('T').mean().interpolate(method='time')
+                cropped_df = filled_df.loc[(filled_df.index >= start_date) & (filled_df.index <= end_date)]
 
                 # remove any times not in interval (4:00 - 20:00]
-                interval_df = filled_df.loc[(filled_df.index.hour >= 4) & (filled_df.index.hour < 20)]
+                interval_df = cropped_df.loc[(cropped_df.index.hour >= 4) & (cropped_df.index.hour < 20)]
                 interval_df = interval_df.loc[(interval_df.index.dayofweek != 5) & (interval_df.index.dayofweek != 6)]
 
                 interval_df.to_csv(filepath)
@@ -198,5 +200,6 @@ class API:
                 # TODO - download new data
                 pbar.update(1)
                 pbar.set_description(f'> Done Alligning')  # hacky way to set last description but hey it works
+        
         return
 

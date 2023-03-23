@@ -31,12 +31,14 @@ class StockData:
         self.spy = None
 
         if stocks is None:
-            stocks = [os.listdir(data_path)[0].split('.')[0]]
+            stocks = [f.split('.')[0] for f in os.listdir(data_path) if f.endswith('.csv')]
 
         if len(stocks) == 0:
             raise ValueError('No stocks provided')
-
-        for stock in (tqdm(stocks + ['SPY'], desc='> Fetching data') if verbose else stocks):
+        
+        self._stocks = sorted(stocks)
+        # stocks + ['SPY']
+        for stock in (tqdm(stocks, desc='> Fetching data') if verbose else stocks):
 
             _df = pd.read_csv(os.path.join(data_path, f'{stock}.csv'))
             
@@ -46,12 +48,9 @@ class StockData:
 
             if stock == 'SPY':
                 self.spy = _df['close'].to_numpy()
-                continue
 
             self._stock_df[stock] = _df[self._measurement]
         self._data = self._compress_data()
-
-        self._stocks = sorted(stocks)
 
         # pre calcualte the price at every iteration for efficiency
         self._prices = np.array([{stock: self._data[i, 1 + s*5]
