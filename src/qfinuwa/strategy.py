@@ -9,7 +9,8 @@ class Strategy:
         # Strategy Base Class
         This is the base class for all strategys. It is not meant to be used directly. Instead, it should be inherited from 
         and the on_data method should be overwritten. The on_data method is called every time the strategy recieves new data.
-
+        The ``on_finish`` is run on the completion of the backtest, and whatever it returns is added to the ``SingleRunResult`` object.
+        
         ## Example
         ```python
         class BasicBollinger(Strategy):
@@ -44,12 +45,12 @@ class Strategy:
                 if v.default is not Parameter.empty
             }
     #---------------[Public Methods]-----------------#
-    def on_data(self, prices: dict, indicators: dict, portfolio: Portfolio) -> None:
-        return
-
     def run_on_data(self, args: tuple, portfolio: Portfolio) -> None:
         portfolio.curr_prices, *data = args
         self.on_data(*data, portfolio)
 
-    def on_finish(self, portfolio: Portfolio) -> None:
-        raise NotImplementedError
+    def on_data(self, prices: dict, indicators: dict, portfolio: Portfolio) -> None:
+        ...
+
+    def on_finish(self) -> None:
+        ...

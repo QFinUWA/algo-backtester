@@ -161,7 +161,7 @@ class Backtester:
         ## Returns
         ``None``
         '''
-        self._indicators._update_parameters(params)
+        self._indicators.update_parameters(params)
 
     def set_strategy(self, strategy_class: Strategy) -> None:
         '''
@@ -261,10 +261,10 @@ class Backtester:
         
             #---------[RUN THE ALGORITHM]---------#
             for params in (tqdm(test, desc=desc, total = end-start, mininterval=0.5) if progressbar and cv == 1 else test):
-                
                 strategy.run_on_data(params, portfolio)
             cash, longs, shorts = portfolio.wrap_up()
-            results.append(SingleRunResult(self.stocks, self._data, self._data.index, (start, end), cash, longs, shorts ))
+            to_add = strategy.on_finish()
+            results.append(SingleRunResult(self.stocks, self._data, self._data.index, (start, end), cash, longs, shorts, to_add ))
             #-------------------------------------#
 
         return MultiRunResult((strategy_params, indicator_params), results)

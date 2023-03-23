@@ -171,11 +171,19 @@ class Indicators:
         vals = {}
         for funcn, indicators in self._funcn_to_indicator_map.items():
             for indicator in indicators:
-                cached = self._get_cached(funcn, params[funcn], indicator).items()
+                cached = self._get_cached(funcn, params[funcn], indicator)
                 vals[indicator] = cached.get(self._NULL_STOCK, cached)
                
         return vals
 
+    def update_parameters(self, params):
+
+        self._raise_invalid_params(params)
+            
+        self.params = self._fill_in_params(params)
+        
+        self._add_parameters(self.params)
+        
     #---------------[Private Methods]-----------------#
 
     def _is_multi(self, indicator_function_name):
@@ -189,13 +197,6 @@ class Indicators:
             curr_params[indicator].update(params[indicator])
         return curr_params
 
-    def _update_parameters(self, params):
-
-        self._raise_invalid_params(params)
-            
-        self.params = self._fill_in_params(params)
-        
-        self._add_parameters(self.params)
     
     def _raise_invalid_params(self, params):
         defaults = self.defaults

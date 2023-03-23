@@ -5,7 +5,9 @@ from tabulate import tabulate
 
 class SingleRunResult:
 
-    def __init__(self, stocks: list, stockdata, datetimeindex: DatetimeIndex, startend: tuple, cash: float, longs: list, shorts: list):
+    def __init__(self, stocks: list, stockdata, 
+            datetimeindex: DatetimeIndex, startend: tuple, 
+            cash: float, longs: list, shorts: list, to_add: object):
         self._start, self._end = startend
 
         datetimeindex = datetimeindex[self._start: self._end]
@@ -30,6 +32,9 @@ class SingleRunResult:
         self._stocks = stocks
 
         self._stockdata = stockdata._stock_df
+
+        if to_add is not None:
+            self.data = to_add
 
     #---------------[Properties]-----------------#
     @property
@@ -81,7 +86,7 @@ class SingleRunResult:
 
 class MultiRunResult:
 
-    def __init__(self, parameters: dict, results: tuple):
+    def __init__(self, parameters: dict, results: list):
         a,i = parameters
         self.parameters = {
             'strategy': a,
@@ -106,6 +111,7 @@ class MultiRunResult:
     def roi(self):
         rois = [result.roi for result in self.results]
         return (np.mean(rois), np.std(rois))
+    
 
     @property
     def statistics(self):

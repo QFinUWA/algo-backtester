@@ -68,12 +68,12 @@ class Plotting:
             bokeh.plotting.output_file(filename)
 
     @classmethod
-    def plot_indicators(cls, indicators: str, data_folder: str, stocks: list = [], filename: bool=None) -> None:
+    def plot_indicators(cls, indicators, data_folder: str, stocks: list = [], filename: bool=None) -> None:
         '''
         Plot custom indicators over time.
 
         ## Parameters
-        - ``indicators`` (``str``): The name of the indicator class.
+        - ``indicators`` (``class``): The indicator class.
         - ``data_folder`` (``str``): The folder containing the stock data.
         - ``stocks`` (``list``): A list of stocks to plot.
         - ``filename`` (``str``): The filename to save the plot to. If ``None``, the plot will be displayed in a browser.
