@@ -42,6 +42,7 @@ if __name__ == "__main__":
 
     backtester = Backtester( ['AAPL', 'GOOG'],
                             data=data_folder_dir,  months=3, fee=0.01)
+    backtester.run()
 
     backtester.update_strategy(RandomStrategy)
 

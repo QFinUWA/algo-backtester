@@ -158,6 +158,7 @@ invert_dict.py
 
 # private information
 API_key.txt
+file_ids.txt
 
 # cython builds
 *.c 

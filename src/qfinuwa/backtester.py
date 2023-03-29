@@ -23,7 +23,6 @@ except NameError:
     
 class Backtester:
 
-
     def __init__(self, stocks: list, 
             strategy_class: Strategy, indicator_class: Indicators, 
             data: str=r'\data', days: Union[int , str] = 'all', 
@@ -60,7 +59,9 @@ class Backtester:
         ```python
         from qfinuwa import Backtester
 
-        backtester = Backtester(['AAPL', 'GOOG'], data=r'\data', days=90, fee=0.01)
+        backtester = Backtester(CustomStrategy, CustomIndicators, 
+                                data=r'\data', days=90, 
+                                cash=1000, fee=0.01)
         ```
 
         '''
@@ -105,6 +106,10 @@ class Backtester:
         x = self._strategy.defaults()
         x.update(self._strategy_params)  
         return x
+
+    @property
+    def strategy_defaults(self):
+        return self._strategy.defaults()
     
     @property
     def days(self):
@@ -115,6 +120,23 @@ class Backtester:
         return self._starting_balance
     
     #---------------[Public Methods]-----------------#
+    @property
+    def indicators(self):
+        return self._indicators
+
+    @indicators.setter
+    def indicators(self, indicator_class: Indicators) -> None:
+        '''
+        Updates the stored indicators.
+
+        ## Parameters
+        - ``indicator_class`` (``Indicator``): subclass of Indicators
+
+        ## Returns
+        ``None``
+        '''
+        self._indicators = indicator_class(self._data)
+
     def set_days(self, days: Union[int, str]) -> None:
         '''
         Sets the number of days to run the strategy on.
@@ -150,20 +172,19 @@ class Backtester:
             raise ValueError('balance must be a positive number')
         self._starting_balance = balance
 
+    # def set_indicator_params(self, params: dict) -> None:
+    #     '''
+    #     Sets the stored indicators.
 
-    def set_indicator_params(self, params: dict) -> None:
-        '''
-        Sets the stored indicators.
+    #     ## Parameters
+    #     - ``indicator_class`` (``Indicator``): subclass of Indicators
 
-        ## Parameters
-        - ``indicator_class`` (``Indicator``): subclass of Indicators
+    #     ## Returns
+    #     ``None``
+    #     '''
+    #     self.indicators.update_parameters(params)
 
-        ## Returns
-        ``None``
-        '''
-        self._indicators.update_parameters(params)
-
-    def set_strategy(self, strategy_class: Strategy) -> None:
+    def strategy_set(self, strategy_class: Strategy) -> None:
         '''
         Sets the stored strategy.
 
@@ -179,31 +200,19 @@ class Backtester:
             print('! Strategy parameters changed: resetting to defaults !')
             self.strategy_params = strategy_class.defaults()
             
-    def update_indicators(self, indicator_class: Indicators) -> None:
+    def strategy_update_params(self, params: dict) -> None:
         '''
-        Updates the stored indicators.
+        Sets the stored strategy parameters.
 
         ## Parameters
-        - ``indicator_class`` (``Indicator``): subclass of Indicators
-
-        ## Returns
-        ``None``
-        '''
-        self._indicators = indicator_class(self._data)
-
-    def set_strategy_params(self, params: dict) -> None:
-        '''
-        Sets the stored strategy.
-
-        ## Parameters
-        - ``strategy_class`` (``Strategy``): subclass of Strategy
+        - ``params`` (``dict``): updates to be make to the strategy.
 
         ## Returns
         ``None``
         '''
 
-        if not self._strategy:
-            raise ValueError('No strategy specified')
+        # if not self._strategy:
+        #     raise ValueError('No strategy specified')
         self._strategy_params.update({k:v for k,v in params.items() if k in self._strategy.defaults()})
 
     def run(self, strategy_params: dict = None, indicator_params: dict = None, progressbar: bool=True, cv: int = 1, seed: int = None) -> MultiRunResult:
@@ -263,8 +272,8 @@ class Backtester:
             for params in (tqdm(test, desc=desc, total = end-start, mininterval=0.5) if progressbar and cv == 1 else test):
                 strategy.run_on_data(params, portfolio)
             cash, longs, shorts = portfolio.wrap_up()
-            to_add = strategy.on_finish()
-            results.append(SingleRunResult(self.stocks, self._data, self._data.index, (start, end), cash, longs, shorts, to_add ))
+            on_finish = strategy.on_finish()
+            results.append(SingleRunResult(self.stocks, self._data, self._data.index, (start, end), cash, longs, shorts, on_finish ))
             #-------------------------------------#
 
         return MultiRunResult((strategy_params, indicator_params), results)

@@ -8,93 +8,221 @@ To install on your system, use pip:
 pip install qfinuwa
 ```
 
-## API
+## API Class
 
+To pull market data ensure you have a text file with the API key and call ``API.fetch_stocks``:
 
-## Strategy
+```py
+from qfinuwa import API
 
-You strategy can be initialised as follows:
+path_to_API = 'API_key.txt'
+download_folder = './data'
+
+API.fetch_stocks(['AAPL', 'GOOG', 'TSLA'], path_to_API, download_folder)
+```
+
+To pull prepepared data from QFin's googledrive, call ``API.fetch_prepared_data``:
 
 ```py
 
-class MyCustomStrategy(Strategy):
-  
-    def __init__(self):
-        return
+file_ids = 'file_ids.txt'
+download_folder = './data'
+
+API.fetch_prepared_data(file_ids, download_folder)
+```
+
+## Indicator Class
+
+#### Multi-Indicators
+
+A multi-indicator takes in a single signal (price of an arbitary stock) and outputs a transformation of that stock.
+
+It is called ``MultiIndicator`` because the indicator will have multiple values (one for each stock)
+
+```py
+# Example 
+
+class CustomIndicators(Indicators):
+    
+    @Indicators.MultiIndicator
+    def bollinger_bands(self, stock: pd.DataFrame):
+        BOLLINGER_WIDTH = 2
+        WINDOW_SIZE = 100
         
-    def on_data(self, data, indicators, portfolio):
-        return
+        mid_price = (stock['high'] + stock['low']) / 2
+        rolling_mid = mid_price.rolling(WINDOW_SIZE).mean()
+        rolling_std = mid_price.rolling(WINDOW_SIZE).std()
 
+        return {"upper_bollinger": rolling_mid + BOLLINGER_WIDTH*rolling_std,
+                "lower_bollinger": rolling_mid - BOLLINGER_WIDTH*rolling_std}
 ```
 
-Any hyperparameters you want to add to your model you can do in ``__init__``.
 
+### Single-Indicators
 
-### on_data
+Similar to ``MultiIndicator``, ``SingleIndicator`` is implemented as a function that takes in stock data and returns an indicator or indicators.
 
-``on_data`` takes in data and indicators which are both type ``dict``, keyed by the stocks. The portfolio class manages buying and selling stocks. 
-
-### Indicators
-
-To add an indicator to be passed into ``on_data`` during evalutation, define a new function in your strategy class that takes in data and returns a data column of the same length.
+It is called ``SingleIndicator`` because there is only a single signal.
 
 ```py
-# super bad example I need to change this
-class MyCustomStrategy(Strategy):
-  
-    def __init__(self):
-        return
+# Example 
+class CustomIndicators(Indicators):
+
+    @Indicators.SingleIndicator
+    def etf(self, stock: dict):
+
+        apple = 0.2
+        tsla = 0.5
+        goog = 0.3
+
+        return {'etf': apple*stock['AAPL'] + tsla*stock['TSLA'] + goog*stock['GOOG']}
+```
+
+### Manually Testing
+
+You can manually test you indicators as follows:
+
+```py
+
+stock_a = pd.from_csv('stockA.csv')
+stock_b = pd.from_csv('stockA.csv')
+
+# multi-indicator for stockA (returns dict of dict of pd.Series)
+output_a = CustomIndicators.bollinger(stockA)
+# multi-indicator for stockB (returns dict of dict of pd.Series)
+output_b = CustomIndicators.bollinger(stockA)
+
+# single-indicator for stockA + stockB (returns dict of pd.Series)
+output = CustomIndicators.etf({'stockA': stock_a, 'stockB': stock_b})
+```
+
+### Hyper-parameters
+
+Each function you implement can be thought of as a hyperparameter "group" that bundles the indicator it returns (the keys to the dictionary the indicator function returns).
+
+The backtester can change hyperparameters for you, but to do so you need to give each one a name, in the form of ``kwargs``.
+
+The ``kwargs`` must include a default value which will be used if you do not specify a value.
+
+```py
+class CustomIndicators(Indicators):
+    
+    @Indicators.MultiIndicator
+    def bollinger_bands(self, stock: pd.DataFrame, BOLLINGER_WIDTH = 2, WINDOW_SIZE=100):
         
-    def on_data(self, data, indicators, portfolio):
-        return
+        mid_price = (stock['high'] + stock['low']) / 2
+        rolling_mid = mid_price.rolling(WINDOW_SIZE).mean()
+        rolling_std = mid_price.rolling(WINDOW_SIZE).std()
 
-    @Strategy.indicator
-    def vol_difference(data):
-        return data['volume'].diff() + addition
+        return {"upper_bollinger": rolling_mid + BOLLINGER_WIDTH*rolling_std,
+                "lower_bollinger": rolling_mid - BOLLINGER_WIDTH*rolling_std}
+
+    @Indicators.SingleIndicator
+    def etf(self, stock: dict, apple = 0.2, tsla= 0.5, goog=0.3):
+
+        return {'etf': apple*stock['AAPL'] + tsla*stock['TSLA'] + goog*stock['GOOG']}
 ```
 
-In the above example we added an indicator called ``"vol_difference"`` that can be accessed during execution by 
+## Strategy Class
+
+To define your strategy extend ``qfin.Strategy`` to inherit its functionalities. Implement your own ``on_data`` function.
+
+Your ``on_data`` function will be expected to take 4 positional arguments.
+- ``self``: reference to this object
+- ``prices``: a dictionary of numpy arrays of historical prices
+- ``portfolio``: object that manages positions
+
+Similar to ``qfin.Indicators``, you can define hyperparameters for your model in ``__init__``.
 
 ```py
+# Example Strategy
+class BasicBollinger(Strategy):
+
+    def __init__(self, quantity=1):
+        self.quantity = quantity
+        return
+
+    def on_data(self, prices, indicators, portfolio):
         
-    def on_data(self, data, indicators, portfolio):
+        # If current price is below lower Bollinger Band, enter a long position
+        if(prices['close']['AAPL'][-1] < indicators['lower_bollinger']['AAPL'][-1]):
+            portfolio.cover_short('AAPL', quantity=self.quantity)
+            portfolio.enter_long('AAPL', quantity=self.quantity)
 
-        V = indicators["vol_difference"]
-
-        return
+        # If current price is above upper Bollinger Band, enter a long position   
+        if(prices['close']['AAPL'][-1] > indicators['upper_bollinger']['AAPL'][-1]):
+            portfolio.sell_long('AAPL', quantity=self.quantity)
+            portfolio.enter_short('AAPL', quantity=self.quantity)
 ```
+Additionally, you can specify a function ``on_finish`` that will run on the completion of a run, if you want to save your own data. Whatever this function returns will can be accessed in the results (see ``SingleRunResults.on_finish``).
+## Backtester Class
 
-We can also add parameters to the indicator and strategy itself, but we'll see that later.
+The ``Backtester`` class asks for a custom strategy, custom indicators and data from the user. Once created, it can run multiple backtests without having to recalculate the indicators - when used in a Notebook environment the backtester object can persist and incrementally updated with new values.
 
-## Backtester 
+### Creating a Backtester
 
-The ``Backtester`` class runs backtests given the inputs:
-- An strategy to test
-- Data to test it on
-- Hyperparameters for the strategy including
-  - Strategy Hyperparameters
-  - Indicator Hyperparameters
-- Starting Balance and Fee
-- Evaluation time
+See ``qfinuwa.Backtester`` docstrings for specifics.
 
-A backtester can be initialised like so:
 
 ```py
-backtester = Backtester(['AAPL', 'GOOG'])
+from qfinuwa import Backtester
+
+backtester = Backtester(CustomStrategy, CustomIndicators, 
+                        data=r'\data', days=90, 
+                        cash=1000, fee=0.01)
 ```
 
-You can pass in your strategy when initialising, or later.
+### Update Indicator Parameters
 
 ```py
-backtester = Backtester(['AAPL', 'GOOG'], strategy=MyCustomStrategy)
+backtester.indicators.update_params(dict_of_updates)
 ```
 
-TODO finish this section.
+### Get Indicator Current Parameters
 
-## Additional Info
+```py
+backtester.indicators.params
+```
+
+### Get Indicator Defaults
+
+```py
+backtester.indicators.defaults
+```
+
+### Updating Indicator Class
+
+```py
+backtester.indicators = NewIndicatorClass
+```
+
+### Update Strategy Parameters
+
+```py
+backtester.strategy_update_params(dict_of_updates)
+```
+
+### Get Strategy Current Parameters
+
+```py
+backtester.strategy_params
+```
+
+### Get Strategy Defaults
+
+```py
+backtester.strategy_defaults
+```
 
 
-### Time Scaling 
+### Updating Strategy Class
+
+```py
+backtester.strategy_set(NewStrategyClass)
+```
+## Running a Backtester
+
+## Time Complexity Analysis 
 
 ![Time scaling of Backtester.__init__](./imgs/__init__.png?raw=true)
 

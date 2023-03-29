@@ -7,7 +7,7 @@ class SingleRunResult:
 
     def __init__(self, stocks: list, stockdata, 
             datetimeindex: DatetimeIndex, startend: tuple, 
-            cash: float, longs: list, shorts: list, to_add: object):
+            cash: float, longs: list, shorts: list, on_finish: object):
         self._start, self._end = startend
 
         datetimeindex = datetimeindex[self._start: self._end]
@@ -33,8 +33,7 @@ class SingleRunResult:
 
         self._stockdata = stockdata._stock_df
 
-        if to_add is not None:
-            self.data = to_add
+        self.on_finish = on_finish
 
     #---------------[Properties]-----------------#
     @property

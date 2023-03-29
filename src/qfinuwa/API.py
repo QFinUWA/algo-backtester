@@ -27,7 +27,7 @@ class API:
 
     #---------------[Public Methods]-----------------#    
     @classmethod
-    def fetch_anonymous(cls, data_folder: str = '', links: str=None) -> None:
+    def fetch_prepared_data(cls, file_ids: str, data_folder: str) -> None:
         '''
         Fetches the anonymised data from a google drive provided by QFIN. The data is stored in the folder specified by `data_folder`.
 
@@ -41,10 +41,8 @@ class API:
         if not os.path.exists(data_folder):
             os.mkdir(data_folder)
 
-        file_ids = ['15SdLhjtojM72tHitPN0nnjxo08d1RPuK', '134dhKv9JZAQpp1ZR-F8eukS0W1QnU35e', '1G8tUL2z7zHwRnHWR3rivmWwswsnhohDa']
-
-        if links is not None:
-            with open(links, 'r') as f:
+        if file_ids is not None:
+            with open(file_ids, 'r') as f:
                 file_ids = f.readlines()
         
         with ThreadPool() as p:

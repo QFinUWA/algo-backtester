@@ -16,7 +16,7 @@ except NameError:
 
 class StockData:
 
-    def __init__(self, data_path: str, stocks: list = None, verbose: bool=False):
+    def __init__(self, data_path: str = None, stocks: list = None, verbose: bool=False):
 
         self._measurement = ['open', 'close', 'high', 'low', 'volume']
         self._i = 0
@@ -30,11 +30,15 @@ class StockData:
 
         self.spy = None
 
-        if stocks is None:
-            stocks = [f.split('.')[0] for f in os.listdir(data_path) if f.endswith('.csv')]
+        self._stocks = []
 
-        if len(stocks) == 0:
-            raise ValueError('No stocks provided')
+        if data_path is None: return
+        
+        if stocks is None:
+            stock = [f.split('.')[0] for f in os.listdir(data_path) if f.endswith('.csv')]
+
+        # if len(stocks) == 0:
+        #     raise ValueError('No stocks provided')
         
         self._stocks = sorted(stocks)
         # stocks + ['SPY']

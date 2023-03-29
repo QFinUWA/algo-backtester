@@ -8,7 +8,7 @@ from .opt._stockdata import StockData
 
 class Indicators:
 
-    def __init__(self, stockdata='data'):
+    def __init__(self, stockdata=None):
 
         '''
         # Indicators Base Class
@@ -91,8 +91,8 @@ class Indicators:
         '''
         self._NULL_STOCK = '.'
         self.params = self.defaults
-        if isinstance(stockdata, str):
-            stockdata = StockData(data_path=stockdata)
+    
+        stockdata = StockData(stockdata=stockdata)
 
         self._data = stockdata._stock_df
         self._index = stockdata._index
@@ -120,8 +120,12 @@ class Indicators:
     
     #---------------[Properties]-----------------#
     @property
-    def indicators(self):
+    def names(self):
         return sorted(sum((v for v in self._funcn_to_indicator_map.values()), start = []))
+
+    @property
+    def groups(self):
+        return sorted(list(self._funcn_to_indicator_map.keys()))
 
     @property
     def _singles(self):
@@ -131,10 +135,6 @@ class Indicators:
     def _multis(self):
         return sorted(sum((v for k,v in self._funcn_to_indicator_map.items() if self._is_multi(k)), start = []))
     
-    @property
-    def indicator_groups(self):
-        return sorted(list(self._funcn_to_indicator_map.keys()))
-
     @property
     def _indicator_functions(self):
         # TODO: filter by only functions
@@ -164,7 +164,7 @@ class Indicators:
         return self._index
 
     #---------------[Public Methods]-----------------#
-    def indicator_values(self, params: dict=None) -> dict:
+    def values(self, params: dict=None) -> dict:
         '''
         Return a dictionary of indicator names and values.
 
@@ -174,6 +174,9 @@ class Indicators:
         ## Returns
         - ``dict``: A dictionary of indicator names and values.
         '''
+        if len(self) == 0: 
+            raise ValueError('No data to calculate indicators on. See __init__ docstring.')
+
         if params is None:
             params = self.params
 
@@ -189,7 +192,7 @@ class Indicators:
                
         return vals
 
-    def update_parameters(self, params: dict) -> None:
+    def update_params(self, params: dict) -> None:
         '''
         Update the parameters for the indicators.
 
