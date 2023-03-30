@@ -21,14 +21,14 @@ download_folder = './data'
 API.fetch_stocks(['AAPL', 'GOOG', 'TSLA'], path_to_API, download_folder)
 ```
 
-To pull prepepared data from QFin's googledrive, call ``API.fetch_prepared_data``:
+To pull prepepared data from QFin's googledrive, call ``API.from_google_drive``:
 
 ```py
 
 file_ids = 'file_ids.txt'
 download_folder = './data'
 
-API.fetch_prepared_data(file_ids, download_folder)
+API.from_google_drive(file_ids, download_folder)
 ```
 
 ## Indicator Class

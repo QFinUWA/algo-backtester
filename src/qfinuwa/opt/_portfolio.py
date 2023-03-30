@@ -94,7 +94,8 @@ class Portfolio:
                 ##
                 elif quantity_bool:
                     value = quantity*self._curr_prices[stock]*self._fee_mult
-            
+
+                # TODO: fix to be -delta
                 if value > self._cash:
 
                     return 0

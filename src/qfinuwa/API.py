@@ -9,7 +9,7 @@ import requests
 import zipfile
 import io
 from typing import Union
-
+import time
 # try:
 #     shell = get_ipython().__class__.__name__
 #     if shell in ['ZMQInteractiveShell']:
@@ -27,12 +27,12 @@ class API:
 
     #---------------[Public Methods]-----------------#    
     @classmethod
-    def fetch_prepared_data(cls, file_ids: str, data_folder: str) -> None:
+    def from_google_drive(cls, file_ids: str, data_folder: str) -> None:
         '''
-        Fetches the anonymised data from a google drive provided by QFIN. The data is stored in the folder specified by `data_folder`.
+        Fetches data from a google drive provided by QFIN. The data is stored in the folder specified by `data_folder`.
 
         ### Parameters
-        - ``links`` (``str``): The path to a file containing the file ids of the data. If not provided, the default file ids will be used.
+        - ``file_ids`` (``str``): The path to a file containing the file ids of the data.
         - ``data_folder`` (``str``): The path to the folder where the data will be stored.
 
         ### Returns
@@ -43,8 +43,8 @@ class API:
 
         if file_ids is not None:
             with open(file_ids, 'r') as f:
-                file_ids = f.readlines()
-        
+                file_ids = [k.strip('\n') for k in f.readlines()]
+        print(file_ids)
         with ThreadPool() as p:
             p.starmap(cls._download_file_from_google_drive, [(fileid, data_folder) for fileid in file_ids])
     
@@ -80,6 +80,7 @@ class API:
 
         years = [2,1]
         months = range(12,0,-1)
+        
         with tqdm(stocks) as pbar:
             for stock in stocks:
 
@@ -92,7 +93,7 @@ class API:
 
                 path = os.path.join(data_folder, f"{stock}.csv")
                 if not os.path.exists(path):
-
+                    t_last = time.time()
                     with ThreadPool(n_threads) as p:
                         results = p.map(cls._process_request, urls)
                     # pbar.set_description(f'> Processing {stock}')
@@ -106,7 +107,11 @@ class API:
                     # df.to_csv(cls.to_path(stock + '_raw'), index=False)
                     path = os.path.join(data_folder, f"{stock}.csv")
                     stock_df.append((path, df))
-
+                
+                t_now = time.time()
+                time.sleep( max(0,30 - (t_now-t_last)))
+                pbar.set_description('Blocking...')
+                
                 pbar.update(1)
                 pbar.set_description(f'> Done Fetching') # hacky way to set last description but hey it works
         cls._allign_data(stock_df)
@@ -115,11 +120,21 @@ class API:
     @classmethod
     def _download_file_from_google_drive(cls, id: str, data_folder: str) -> None:
         URL = "https://docs.google.com/uc?export=download"
+        # URL = 'https://drive.google.com/drive/folders/?usp=share_link'
 
         session = requests.Session()
 
         response = session.get(URL, params = { 'id' : id }, stream = True)
+
+        def get_confirm_token(response):
+            for key, value in response.cookies.items():
+                if key.startswith('download_warning'):
+                    return value
+
+            return None
         
+        token = get_confirm_token(response)
+
         token = None
         for key, value in response.cookies.items():
             if key.startswith('download_warning'):
@@ -129,7 +144,7 @@ class API:
         if token:
             params = { 'id' : id, 'confirm' : token }
             response = session.get(URL, params = params, stream = True)
-
+        
         CHUNK_SIZE = 32768
 
         with io.BytesIO() as f:
