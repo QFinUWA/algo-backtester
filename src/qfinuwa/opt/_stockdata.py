@@ -5,14 +5,15 @@ from itertools import product
 
 from IPython import get_ipython
 
-try:
-    shell = get_ipython().__class__.__name__
-    if shell in ['ZMQInteractiveShell']:
-        from tqdm.notebook import tqdm as tqdm   # Jupyter notebook or qtconsole or Terminal running IPython  
-    else:
-        from tqdm import tqdm   
-except NameError:
-    from tqdm import tqdm      # Probably standard Python interpreter
+# try:
+#     shell = get_ipython().__class__.__name__
+#     if shell in ['ZMQInteractiveShell']:
+#         from tqdm.notebook import tqdm as tqdm   # Jupyter notebook or qtconsole or Terminal running IPython  
+#     else:
+#         from tqdm import tqdm   
+# except NameError:
+#     from tqdm import tqdm      # Probably standard Python interpreter
+from tqdm import tqdm
 
 class StockData:
 
