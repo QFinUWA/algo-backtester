@@ -16,7 +16,7 @@ except NameError:
 
 class StockData:
 
-    def __init__(self, data_path: str = None, stocks: list = None, verbose: bool=False):
+    def __init__(self, data_folder: str = None, stocks: list = None, verbose: bool=False):
 
         self._measurement = ['open', 'close', 'high', 'low', 'volume']
         self._i = 0
@@ -32,10 +32,10 @@ class StockData:
 
         self._stocks = []
 
-        if data_path is None: return
+        if data_folder is None: return
         
         if stocks is None:
-            stock = [f.split('.')[0] for f in os.listdir(data_path) if f.endswith('.csv')]
+            stock = [f.split('.')[0] for f in os.listdir(data_folder) if f.endswith('.csv')]
 
         # if len(stocks) == 0:
         #     raise ValueError('No stocks provided')
@@ -44,7 +44,7 @@ class StockData:
         # stocks + ['SPY']
         for stock in (tqdm(stocks, desc='> Fetching data') if verbose else stocks):
 
-            _df = pd.read_csv(os.path.join(data_path, f'{stock}.csv'))
+            _df = pd.read_csv(os.path.join(data_folder, f'{stock}.csv'))
             
             if self._L == 0:
                 self._L = len(_df)

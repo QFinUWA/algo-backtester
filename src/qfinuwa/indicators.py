@@ -8,7 +8,7 @@ from .opt._stockdata import StockData
 
 class Indicators:
 
-    def __init__(self, stockdata=None):
+    def __init__(self, data: str=None):
 
         '''
         # Indicators Base Class
@@ -91,8 +91,16 @@ class Indicators:
         '''
         self._NULL_STOCK = '.'
         self.params = self.defaults
-    
-        stockdata = StockData(stockdata=stockdata)
+
+        if data is None:
+            stockdata = StockData()
+            return
+        elif isinstance(data, str):
+            stockdata = StockData(data_folder=data)
+        elif isinstance(data, StockData):
+            stockdata = data
+        else:
+            raise TypeError(f"Expected data to be of type str or StockData, got {type(data)} instead.")
 
         self._data = stockdata._stock_df
         self._index = stockdata._index

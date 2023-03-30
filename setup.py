@@ -7,6 +7,6 @@ setuptools.setup(name='qfinuwa',
       packages = setuptools.find_packages(where="src"),
       python_requires = ">=3.6",
       install_requires=[
-          'tqdm', 'tabulate', 'bokeh'
+          'tqdm', 'tabulate', 'bokeh', 'requests', 
       ]
       )

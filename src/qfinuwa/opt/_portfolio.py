@@ -66,7 +66,6 @@ class Portfolio:
         
         try:
             if direction == 'long':
-
                 ##
                 if cost_bool:
                     quantity = value*self._fee_div/self._curr_prices[stock]
@@ -76,16 +75,13 @@ class Portfolio:
                     value = quantity*self._curr_prices[stock]*self._fee_mult
 
                 if value > self._cash:
-                    return 0
-
+                    return 1
                 self._cash -= value
 
                 self._n_longs[stock] += quantity
-
                 heapq.heappush(self._longs[stock], (value, quantity))
-                self._long_stats['buy'].append((self._i, stock, quantity))
+                self._long_stats['enter'].append((self._i, stock, quantity))
 
-                return 1
             elif direction == 'short':
                 ##
                 if cost_bool:
@@ -97,17 +93,16 @@ class Portfolio:
 
                 # TODO: fix to be -delta
                 if value > self._cash:
-
-                    return 0
+                    return 1
 
                 self._cash -= value
 
                 self._n_shorts[stock] += quantity
                 heapq.heappush(self._shorts[stock], (-value, quantity))
                 self._short_stats['enter'].append((self._i, stock, quantity))
-                return 1  
+ 
         except Exception as e:
-            return 0
+            return 2
         
         return 0
 
@@ -164,14 +159,10 @@ class Portfolio:
                     total_pay += quant*self._curr_prices[stock]
                     self._n_longs[stock] -= quant
                     
-                if abs_rem == abs_rem_original:
-                    return 0
-                ## -----
+                if abs_rem != abs_rem_original:
+                    self._cash += total_pay
+                    self._long_stats['exit'].append((self._i, stock, total_pay - total_cost))
                 
-                self._cash += total_pay
-                self._long_stats['sell'].append((self._i, stock, total_pay - total_cost))
-                
-                return 1
             elif direction == 'short':
         
                 cost_to_buy = deposit = 0
@@ -211,16 +202,15 @@ class Portfolio:
                     cost_to_buy += quant*self._curr_prices[stock]
                     self._n_shorts[stock] -= quant
 
-                if abs_rem == abs_rem_original:
-                    return 0
+                if abs_rem != abs_rem_original:
 
-                profit = deposit - self._fee_mult*cost_to_buy 
-                self._cash += profit + deposit
+                    profit = deposit - self._fee_mult*cost_to_buy 
+                    self._cash += profit + deposit
 
-                self._short_stats['close'].append((self._i, stock, profit))
-                return 1
+                    self._short_stats['exit'].append((self._i, stock, profit))
+               
         except Exception as e:
-            return 0
+            return 2
         return 0
 
         
@@ -231,7 +221,6 @@ class Portfolio:
         for stock in self._stocks:
             self.exit_position('long', stock, quantity=l_remaining[stock])
             self.exit_position('short', stock, quantity=s_remaining[stock])
-        
         return (self._cash_history, self._long_stats, self._short_stats)
     
 

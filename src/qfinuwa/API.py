@@ -44,7 +44,7 @@ class API:
         if file_ids is not None:
             with open(file_ids, 'r') as f:
                 file_ids = [k.strip('\n') for k in f.readlines()]
-        print(file_ids)
+
         with ThreadPool() as p:
             p.starmap(cls._download_file_from_google_drive, [(fileid, data_folder) for fileid in file_ids])
     
@@ -146,14 +146,16 @@ class API:
             response = session.get(URL, params = params, stream = True)
         
         CHUNK_SIZE = 32768
+        try:
+            with io.BytesIO() as f:
+                for chunk in response.iter_content(CHUNK_SIZE):
+                    if chunk: # filter out keep-alive new chunks
+                        f.write(chunk)
 
-        with io.BytesIO() as f:
-            for chunk in response.iter_content(CHUNK_SIZE):
-                if chunk: # filter out keep-alive new chunks
-                    f.write(chunk)
-
-            with zipfile.ZipFile(f) as z:
-                z.extractall(path=data_folder)
+                with zipfile.ZipFile(f) as z:
+                    z.extractall(path=data_folder)
+        except:
+            print(f'Error downloading file {id} - skipping')
 
 
     @classmethod

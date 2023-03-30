@@ -172,53 +172,56 @@ backtester = Backtester(CustomStrategy, CustomIndicators,
                         cash=1000, fee=0.01)
 ```
 
-### Update Indicator Parameters
+## Updating Indicator Parameters
+
+### Update Parameters
 
 ```py
 backtester.indicators.update_params(dict_of_updates)
 ```
 
-### Get Indicator Current Parameters
+### Get Current Parameters
 
 ```py
 backtester.indicators.params
 ```
 
-### Get Indicator Defaults
+### Get Defaults
 
 ```py
 backtester.indicators.defaults
 ```
 
-### Updating Indicator Class
+### Updating Class
 
 ```py
 backtester.indicators = NewIndicatorClass
 ```
 
-### Update Strategy Parameters
+## Updating Strategy Parameters
+
+### Update Parameters
 
 ```py
-backtester.strategy_update_params(dict_of_updates)
+backtester.strategy.update_params(dict_of_updates)
 ```
 
-### Get Strategy Current Parameters
+### Get Current Parameters
 
 ```py
-backtester.strategy_params
+backtester.strategy.params
 ```
 
-### Get Strategy Defaults
+### Get Defaults
 
 ```py
-backtester.strategy_defaults
+backtester.strategy.defaults
 ```
 
-
-### Updating Strategy Class
+### Updating  Class
 
 ```py
-backtester.strategy_set(NewStrategyClass)
+backtester.strategy = NewStrategyClass
 ```
 ## Running a Backtester
 
