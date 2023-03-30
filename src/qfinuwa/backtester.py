@@ -119,10 +119,11 @@ class Backtester:
     def starting_balance(self):
         return self._starting_balance
     
-    #---------------[Public Methods]-----------------#
     @property
     def indicators(self):
         return self._indicators
+
+    #---------------[Public Methods]-----------------#
 
     @indicators.setter
     def indicators(self, indicator_class: Indicators) -> None:

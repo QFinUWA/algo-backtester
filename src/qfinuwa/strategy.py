@@ -1,6 +1,6 @@
 from .opt._portfolio import Portfolio
 from inspect import signature, Parameter
-
+from functools import wraps
 
 class Strategy:
 
@@ -43,7 +43,7 @@ class Strategy:
                 k: v.default
                 for k, v in signature(cls.__init__).parameters.items()
                 if v.default is not Parameter.empty
-            }
+            }    
     #---------------[Public Methods]-----------------#
     def run_on_data(self, args: tuple, portfolio: Portfolio) -> None:
         portfolio.curr_prices, *data = args
