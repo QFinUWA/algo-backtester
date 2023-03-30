@@ -4,12 +4,12 @@ import urllib.parse as urlparse
 from itertools import product
 from multiprocessing.pool import ThreadPool
 from multiprocessing import cpu_count
-from IPython import get_ipython
 import requests
 import zipfile
 import io
 from typing import Union
 import time
+# from IPython import get_ipython
 # try:
 #     shell = get_ipython().__class__.__name__
 #     if shell in ['ZMQInteractiveShell']:

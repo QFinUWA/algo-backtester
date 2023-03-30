@@ -3,7 +3,7 @@ import pandas as pd
 import os
 from itertools import product
 
-from IPython import get_ipython
+# from IPython import get_ipython
 
 # try:
 #     shell = get_ipython().__class__.__name__
