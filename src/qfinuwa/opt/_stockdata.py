@@ -75,6 +75,10 @@ class StockData:
         return self._index
     
     @property
+    def date_range(self):
+        return min(self._index), max(self._index)
+
+    @property
     def prices(self):
         siss = []
         for index in (tqdm(range(len(self)),  desc = '> Precompiling data', mininterval=0.5) if self._verbose else range(len(self))):

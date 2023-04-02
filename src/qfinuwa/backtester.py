@@ -9,7 +9,8 @@ from .indicators import Indicators
 from typing import Union
 from itertools import islice, tee
 from typing import Union
-
+import datetime
+from dateutil import parser
 # from IPython import get_ipython
 # try:
 #     shell = get_ipython().__class__.__name__
@@ -69,7 +70,7 @@ class Backtester:
 
     def __init__(self,  strategy_class: Strategy, indicator_class: Indicators, 
             stocks: list, 
-            data_folder: str=r'\data', days: Union[int , str] = 'all', 
+            data_folder: str, days: Union[int , str] = 'all', 
             starting_cash: float=1000, fee: float=0.001,
             progressbar=True):
         '''
@@ -209,18 +210,24 @@ class Backtester:
         '''
         return self._strategy_wrapper._strategy
     
+    @property
+    def date_range(self):
+        return self._data.date_range
+    
     #---------------[Public Methods]-----------------#
        
-    def run(self, strategy_params: dict = None, indicator_params: dict = None, progressbar: bool=True, cv: int = 1, seed: int = None) -> MultiRunResult:
+    def run(self, strategy_params: dict = None, indicator_params: dict = None, 
+            cv: int = 1, seed: int = None, start_dates=None,
+            progressbar: bool=True) -> MultiRunResult:
         '''
         Runs the strategy on a set of hyperparameters.
 
         ## Parameters
         - ``strategy_params`` (``dict``): The parameters of the strategy.
         - ``indicator_params`` (``dict``): The parameters of the indicators.
-        - ``progressbar`` (``bool``): Whether to show a progress bar.
         - ``cv`` (``int``): The number of cross-validation folds to use.
         - ``seed`` (``int``): The seed to use for the random number generator.
+        - ``progressbar`` (``bool``): Whether to show a progress bar.
 
         ## Returns
         result (``MultiRunResult``): The results of the strategy.
@@ -245,15 +252,26 @@ class Backtester:
             indicator_params = self._indicators.params
 
         self._random.seed(seed or random.randint(0, 2**32))
-        random_periods = self._get_random_periods(cv) 
+
+        if not start_dates is None:
+            if not isinstance(start_dates, list):
+                raise ValueError('start_dates must be a list')
+            
+            cv = len(start_dates)
+
+            test_periods = self._get_periods(start_dates)
+        else:
+            test_periods = self._get_random_periods(cv) 
         results = []
 
         # caclulate indicators 
         data_og = zip(*self._precomp_prices, self._indicators._iterate_params(indicator_params))
         data_tees = tee(data_og, cv)
-        test_iterator = zip(data_tees, random_periods)
+        test_iterator = zip(data_tees, test_periods)
 
-        desc = f'> Running backtest over {cv} sample{"s" if cv > 1 else ""} of {self._days} day{"s" if self._days > 1 else ""}'
+        days_format = f'{self._days} day{"s" if isinstance(self._days, str) or self._days > 1 else ""}'
+
+        desc = f'> Running backtest over {cv} sample{"s" if cv > 1 else ""} of {days_format}'
         for data, (start, end) in (tqdm(test_iterator, desc = desc, total = cv) if progressbar and cv > 1 else test_iterator):
             portfolio = Portfolio(self.stocks, self._starting_cash, self._fee)
             if strategy_params:
@@ -328,11 +346,30 @@ class Backtester:
     
         s_is = self._random.sample(range(len(days) - self._days), n)
 
-        starts = (str(days.iloc[s_i]) for s_i in s_is)
+
+        starts = (days.iloc[s_i].strftime("%d/%m/%Y") for s_i in s_is)
+
+        return self._get_periods(starts)
         ends = (str(days.iloc[s_i+self._days]) for s_i in s_is)
 
         return [(self._data._index[self._data._index >= start].index[0], self._data._index[self._data._index < end].index[-1]) for start, end in zip(starts, ends)]
     
+    def _get_periods(self, start_dates: list) -> list:
+
+        d = datetime.timedelta(days = self._days)
+        dt_starts = (parser.parse(s, dayfirst=True) for s in start_dates)
+        # dt_starts = [datetime.datetime(date) for date in parsed]
+
+        # dt_starts = start_dates
+        periods = [(s, s+d) for s in dt_starts]
+
+        index_start, index_end = self._data.date_range
+        for s,e in periods:
+            if s < index_start or e > index_end:
+                raise IndexError(f'Date range {s} -> {e} out of bounds: Please ensure start_date and (start_date + days) are in range.')
+
+        return ((self._data._index[self._data._index >= str(s)].index[0], self._data._index[self._data._index < str(e)].index[-1]) for s, e in periods)
+
 
     #---------------[Internal Methods]-----------------#
     def __str__(self):

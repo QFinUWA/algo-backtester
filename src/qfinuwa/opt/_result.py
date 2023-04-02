@@ -43,7 +43,7 @@ class SingleRunResult:
     @property
     def date_range(self):
         # reset index of self.datetimeindex
-        return self._datetimeindex.iloc[0].strftime("%m/%d/%Y"), self._datetimeindex.iloc[-1].strftime("%m/%d/%Y")
+        return self._datetimeindex.iloc[0].strftime("%d/%m/%Y"), self._datetimeindex.iloc[-1].strftime("%d/%m/%Y")
 
     @property
     def statistics(self):
