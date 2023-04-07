@@ -71,7 +71,7 @@ class Backtester:
     def __init__(self,  strategy_class: Strategy, indicator_class: Indicators, 
             stocks: list, 
             data_folder: str, days: Union[int , str] = 'all', 
-            starting_cash: float=1000, fee: float=0.001,
+            delta_limits:  Union[int , dict]=10000, fee: float=0.0,
             progressbar=True):
         '''
         # Backteser
@@ -85,7 +85,7 @@ class Backtester:
         - ``stocks`` (``list``): A list of stock to run the strategy on.
         - ``data_folder`` (``str``): The path to the data folder.
         - ``days`` (``int`` or ``str``): The number of days to run the strategy on. 
-        - ``cash`` (``float``): The starting cash balance.
+        - ``delta_limit`` (``int`` or ``dict``): The general delta limit, or a dictionary of delta limits per instrument.
         - ``fee`` (``float``): The fee to pay on each transaction.
         - ``progressbar`` (``bool``): Whether to show a progress bar when loading data.
 
@@ -106,7 +106,7 @@ class Backtester:
 
         backtester = Backtester(CustomStrategy, CustomIndicators, 
                                 data=r'\data', days=90, 
-                                cash=1000, fee=0.01)
+                                delta_limit=800, fee=0.01)
         ```
 
         '''
@@ -128,7 +128,18 @@ class Backtester:
         self._indicators = indicator_class(data=self._data)
 
         self._fee = fee
-        self._starting_cash = starting_cash  
+        # self._starting_cash = starting_cash  
+        
+            
+        if isinstance(delta_limits, int):
+            self._delta_limits = {stock: delta_limits for stock in self.stocks}
+        elif isinstance(delta_limits, dict):
+            if set(delta_limits.keys()) ^ set(self.stocks):
+                raise ValueError(f'delta_limit either contains unknown stocks or doesn\'t include all stocks')
+            if not all(map(lambda x: isinstance(int, x) and x > 0, delta_limits.values)):
+                raise ValueError(f'delta_limit includes either non int or negative value')
+        else:
+            self._delta_limits = delta_limits
 
         self._days = days
 
@@ -176,15 +187,34 @@ class Backtester:
         
         self._days = days
     
-    @property
-    def starting_cash(self):
-        return self._starting_cash
+    # @property
+    # def starting_cash(self):
+    #     return self._starting_cash
+
     
-    @starting_cash.setter
-    def starting_cash(self, starting_cash):
-        if starting_cash < 0:
-            raise ValueError('starting_cash must be a positive number')
-        self._starting_cash = starting_cash
+    # @starting_cash.setter
+    # def starting_cash(self, starting_cash):
+    #     if starting_cash < 0:
+    #         raise ValueError('starting_cash must be a positive number')
+    #     self._starting_cash = starting_cash
+
+    @property
+    def delta_limits(self):
+        return self._delta_limits
+    
+    @delta_limits.setter
+    def delta_limits(self, delta_limit):
+
+        if isinstance(delta_limit, dict):
+            if set(delta_limit.keys()) ^ set(self.stocks):
+                raise ValueError(f'delta_limit either contains unknown stocks or doesn\'t include all stocks')
+            if not all(map(lambda x: isinstance(int, x) and x > 0, delta_limit.values)):
+                raise ValueError(f'delta_limit includes either non int or negative value')
+            self._delta_limits = delta_limit
+        elif isinstance(delta_limit, int):
+            self._delta_limits = {stock: delta_limit for stock in self.stocks}
+
+        
     
     @property
     def indicators(self):
@@ -273,7 +303,8 @@ class Backtester:
 
         desc = f'> Running backtest over {cv} sample{"s" if cv > 1 else ""} of {days_format}'
         for data, (start, end) in (tqdm(test_iterator, desc = desc, total = cv) if progressbar and cv > 1 else test_iterator):
-            portfolio = Portfolio(self.stocks, self._starting_cash, self._fee)
+            
+            portfolio = Portfolio(self.stocks, self._delta_limits, self._fee)
             if strategy_params:
                 strategy = self._strategy(*tuple(), **strategy_params)
             else:
@@ -284,10 +315,10 @@ class Backtester:
             #---------[RUN THE ALGORITHM]---------#
             for test_data in (tqdm(test, desc=desc, total = end-start, mininterval=0.5) if progressbar and cv == 1 else test):
                 strategy.run_on_data(test_data, portfolio)
-            cash, longs, shorts = portfolio.wrap_up()
+            cash, fees_paid, trades = portfolio.wrap_up()
             on_finish = strategy.on_finish()
 
-            results.append(SingleRunResult(self.stocks, self._data, self._data.index, (start, end), cash, longs, shorts, on_finish ))
+            results.append(SingleRunResult(self.stocks, self._data, self._data.index, (start, end), cash, fees_paid, trades, on_finish ))
             #-------------------------------------#
 
         return MultiRunResult((strategy_params, indicator_params), results)
@@ -382,7 +413,7 @@ class Backtester:
                 f'\t- MultiIndicators: {self._indicators._multis}\n' \
                 f'- Stocks: {self.stocks}\n' + \
                 f'- Fee {self.fee}\n' + \
-                f'- Starting Balance: {self.starting_cash}\n' + \
+                f'- delta_limit: {self.delta_limits}\n' + \
                 f'- Days: {self._days}\n'
                 # f'\t- Indicator Groups: {self._indicators.groups}\n' + \
     

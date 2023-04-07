@@ -12,12 +12,13 @@ class Plotting:
     #---------------[Class Methods]-----------------#
     
     @classmethod
-    def plot_result(cls, result: SingleRunResult, stocks: list=[], transactions_on: str = None, normalise_stocks: bool =True, filename: str = None) -> None:
+    def plot_result(cls, result: SingleRunResult, show_portfolio: bool=True, stocks: list=[], transactions_on: str = None, normalise_stocks: bool =True, filename: str = None) -> None:
         '''
         Plots the results of a single run.
 
         ## Parameters
         - ``result`` (``SingleRunResult``): The result of a single run.
+        - ``show_portfolio`` (``bool``): show portfolio value
         - ``stocks`` (``list``): A list of stocks to plot.
         - ``transactions_on`` (``str``): The stock to plot transactions on. If ``portfolio``, transactions will be plotted on the portfolio value.
         - ``normalise_stocks`` (``bool``): If ``True``, stocks will be normalised to the portfolio value at the start of the run.
@@ -34,34 +35,33 @@ class Plotting:
         p.xaxis.major_label_overrides = {
             i: date.strftime('%Y-%m-%d %H:%S') for i, date in enumerate(result._datetimeindex)
         }
+        
         # -----[plotting portfolio]-----
-        r = np.array([_ for _ in range(len(result.cash))])
-        p.line(r, result.cash, line_width=2, legend_label='portfolio', color='black')
+        cash = [sum(result.cash[s][i] for s in stocks) for i in range(len(list(result.cash.values())[0]))]
+        r = np.array([_ for _ in range(len(cash))])
+        if show_portfolio:
+            p.line(r, cash, line_width=2, legend_label='portfolio', color='black')
 
         # -----[plotting buys and sells]-----
 
         for stock in stocks:
             price = result._stockdata[stock]['close'][result._start:result._end]
-            l = price*result.cash[0]/price.iloc[0] if normalise_stocks else price
-            # print(l)
-            p.line(r, l, line_width=2, color='red', legend_label=stock)
+            p.line(r, price, line_width=2, color='blue', legend_label=stock)
 
-        lbuy = np.array([i for i, *_ in result._longs['enter']])
-        lsell = np.array([i for i, *_ in result._longs['exit']])
-        sbuy = np.array([i for i, *_ in result._shorts['enter']])
-        sclose = np.array([i for i, *_ in result._shorts['exit']])
+        lbuy = np.array([i for i, s, q in result.buys])
+        lsell = np.array([i for i, s,q in result.sells])
+        # sbuy = np.array([i for i, *_ in result._shorts['enter']])
+        # sclose = np.array([i for i, *_ in result._shorts['exit']])
         SIZE = 4
         if transactions_on:
             if transactions_on == 'portfolio':
-                on = result.cash
+                on = cash
             else:
                 l = result._stockdata[transactions_on]['close'][result._start:result._end]
-                on = np.array(l*result.cash[0]/l.iloc[0] if normalise_stocks else l)
+                on = np.array(l)
 
-            p.circle(lbuy, np.array([on[i] for i in lbuy]), color='red', size=SIZE, legend_label='enter long')
-            p.circle(lsell, np.array([on[i] for i in lsell]), color='green', size=SIZE, legend_label='sell long')
-            p.circle(sbuy, np.array([on[i] for i in sbuy]), color='yellow', size=SIZE, legend_label='enter short')
-            p.circle(sclose, np.array([on[i] for i in sclose]), color='pink', size=SIZE, legend_label='cover short')
+            p.circle(lbuy, np.array([on[i] for i in lbuy]), color='red', size=SIZE, legend_label='buy')
+            p.circle(lsell, np.array([on[i] for i in lsell]), color='green', size=SIZE, legend_label='sell')
 
         bokeh.plotting.show(p)
         if filename:

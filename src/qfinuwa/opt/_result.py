@@ -7,25 +7,36 @@ class SingleRunResult:
 
     def __init__(self, stocks: list, stockdata, 
             datetimeindex: DatetimeIndex, startend: tuple, 
-            cash: float, longs: list, shorts: list, on_finish: object):
+            cash: dict, fees_paid: dict, trades: list, on_finish: object):
         self._start, self._end = startend
 
         datetimeindex = datetimeindex[self._start: self._end]
 
-        self._longs = longs
-        self._shorts = shorts 
+        # self._longs = longs
+        # self._shorts = shorts 
 
-        longs = {stock: [p for _,s,p in longs['exit'] if s == stock] for stock in stocks}
-        shorts = {stock: [p for _,s,p in shorts['exit'] if s == stock] for stock in stocks}
-        self.longs = {k: (len(v), np.mean(v or [0]), np.std(v or [0])) for k,v in longs.items()}
-        self.shorts = {k: (len(v), np.mean(v or [0]), np.std(v or [0])) for k,v in shorts.items()}
-        self._sdv = {stock: np.std(longs[stock] + shorts[stock] or [0]) for stock in stocks}
+        # longs = {stock: [p for _,s,p in longs['exit'] if s == stock] for stock in stocks}
+        # shorts = {stock: [p for _,s,p in shorts['exit'] if s == stock] for stock in stocks}
+        # self.longs = {k: (len(v), np.mean(v or [0]), np.std(v or [0])) for k,v in longs.items()}
+        # self.shorts = {k: (len(v), np.mean(v or [0]), np.std(v or [0])) for k,v in shorts.items()}
+        # self._sdv = {stock: np.std(longs[stock] + shorts[stock] or [0]) for stock in stocks}
 
-        std_longs = list(chain.from_iterable(longs[s] for s in longs))
-        std_shorts = list(chain.from_iterable(shorts[s] for s in shorts))
-        self._sdv_longs = 0 if not std_longs else np.std(std_longs)
-        self._sdv_shorts = 0 if not std_shorts else np.std(std_shorts )
-        self._sdv_all = 0 if not (std_shorts or std_longs) else np.std(np.concatenate([std_longs, std_shorts]))
+        # std_longs = list(chain.from_iterable(longs[s] for s in longs))
+        # std_shorts = list(chain.from_iterable(shorts[s] for s in shorts))
+        # self._sdv_longs = 0 if not std_longs else np.std(std_longs)
+        # self._sdv_shorts = 0 if not std_shorts else np.std(std_shorts )
+        # self._sdv_all = 0 if not (std_shorts or std_longs) else np.std(np.concatenate([std_longs, std_shorts]))
+
+        self.buys = [(i,s,q) for i, s,q in trades if q > 0]
+        self.sells = [(i, s,-q) for i,s,q in trades if q < 0]
+
+
+        self.n_buys = {stock: len([q for i,s,q in self.buys if s == stock]) for stock in stocks}
+        self.n_sells = {stock: len([-q for i,s,q in self.sells if s == stock]) for stock in stocks}
+        self.gross_pnl = {stock: cash[stock][-1] - fees_paid[stock] for stock in stocks}
+        self.fees_paid = fees_paid
+        self.net_pnl = {stock: cash[stock][-1] for stock in stocks}
+        
 
         self.cash = cash
         self._datetimeindex = datetimeindex.reset_index(drop=True)
@@ -38,7 +49,7 @@ class SingleRunResult:
     #---------------[Properties]-----------------#
     @property
     def roi(self):
-        return self.cash[-1]/self.cash[0] - 1
+        return sum(c[-1] for c in self.cash.values())
 
     @property
     def date_range(self):
@@ -49,25 +60,24 @@ class SingleRunResult:
     def statistics(self):
 
         df = DataFrame({stock: [
-                self.longs[stock][0] + self.shorts[stock][0],
-                (self.longs[stock][1] + self.shorts[stock][1])/2,
-                self._sdv[stock],
-                self.longs[stock][0],
-                self.longs[stock][1],
-                self.longs[stock][2],
-                self.shorts[stock][0],
-                self.shorts[stock][1],
-                self.shorts[stock][2]] for stock in self._stocks}, index = [f'{b}_{a}' for a,b in product(['trades', 'longs', 'shorts'], ["n", 'mean_per', 'std'])])
+                self.n_buys[stock] + self.n_sells[stock],
+                self.n_buys[stock],
+                self.n_sells[stock],
+                self.gross_pnl[stock],
+                self.fees_paid[stock],
+                self.net_pnl[stock],
+                0 if self.n_buys[stock] + self.n_sells[stock] == 0 else self.net_pnl[stock]/(self.n_buys[stock] + self.n_sells[stock]),
+                    ] for stock in self._stocks}, 
+                    index = ['n_trades', 'n_buys', 'n_sells', 'gross_pnl', 'fees_paid', 'net_pnl', 'pnl_per_trade'])
         
         df['Net'] = [ df.iloc[0, :].sum(),
-                        df.iloc[1, :].mean(),
-                        self._sdv_all,
+                        df.iloc[1, :].sum(),
+                        df.iloc[2, :].sum(),
                         df.iloc[3, :].sum(),
-                        df.iloc[4, :].mean(),
-                        self._sdv_longs,
-                        df.iloc[6, :].sum(),
-                        df.iloc[7, :].mean(),
-                        self._sdv_shorts]
+                        df.iloc[4, :].sum(),
+                        df.iloc[4, :].sum(),
+                        sum(self.net_pnl.values())/(sum(self.n_buys.values()) + sum(self.n_sells.values())),
+                        ]
 
         return df
     
