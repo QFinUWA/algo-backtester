@@ -7,38 +7,21 @@ class SingleRunResult:
 
     def __init__(self, stocks: list, stockdata, 
             datetimeindex: DatetimeIndex, startend: tuple, 
-            cash: dict, fees_paid: dict, trades: list, on_finish: object):
+            value: dict, trades: list, on_finish: object):
         self._start, self._end = startend
 
         datetimeindex = datetimeindex[self._start: self._end]
 
-        # self._longs = longs
-        # self._shorts = shorts 
-
-        # longs = {stock: [p for _,s,p in longs['exit'] if s == stock] for stock in stocks}
-        # shorts = {stock: [p for _,s,p in shorts['exit'] if s == stock] for stock in stocks}
-        # self.longs = {k: (len(v), np.mean(v or [0]), np.std(v or [0])) for k,v in longs.items()}
-        # self.shorts = {k: (len(v), np.mean(v or [0]), np.std(v or [0])) for k,v in shorts.items()}
-        # self._sdv = {stock: np.std(longs[stock] + shorts[stock] or [0]) for stock in stocks}
-
-        # std_longs = list(chain.from_iterable(longs[s] for s in longs))
-        # std_shorts = list(chain.from_iterable(shorts[s] for s in shorts))
-        # self._sdv_longs = 0 if not std_longs else np.std(std_longs)
-        # self._sdv_shorts = 0 if not std_shorts else np.std(std_shorts )
-        # self._sdv_all = 0 if not (std_shorts or std_longs) else np.std(np.concatenate([std_longs, std_shorts]))
-
         self.buys = [(i,s,q) for i, s,q in trades if q > 0]
         self.sells = [(i, s,-q) for i,s,q in trades if q < 0]
 
-
         self.n_buys = {stock: len([q for i,s,q in self.buys if s == stock]) for stock in stocks}
         self.n_sells = {stock: len([-q for i,s,q in self.sells if s == stock]) for stock in stocks}
-        self.gross_pnl = {stock: cash[stock][-1] - fees_paid[stock] for stock in stocks}
-        self.fees_paid = fees_paid
-        self.net_pnl = {stock: cash[stock][-1] for stock in stocks}
-        
+        self.gross_pnl = {stock: value[stock][-1][0] for stock in stocks}
+        self.fees_paid = {stock: value[stock][-1][1] for stock in stocks}
+        self.net_pnl = {stock: value[stock][-1][0] - value[stock][-1][1]  for stock in stocks}
 
-        self.cash = cash
+        self.value = value
         self._datetimeindex = datetimeindex.reset_index(drop=True)
         self._stocks = stocks
 
@@ -49,7 +32,7 @@ class SingleRunResult:
     #---------------[Properties]-----------------#
     @property
     def roi(self):
-        return sum(c[-1] for c in self.cash.values())
+        return sum(self.net_pnl.values())
 
     @property
     def date_range(self):
@@ -75,7 +58,7 @@ class SingleRunResult:
                         df.iloc[2, :].sum(),
                         df.iloc[3, :].sum(),
                         df.iloc[4, :].sum(),
-                        df.iloc[4, :].sum(),
+                        df.iloc[5, :].sum(),
                         sum(self.net_pnl.values())/(sum(self.n_buys.values()) + sum(self.n_sells.values())),
                         ]
 

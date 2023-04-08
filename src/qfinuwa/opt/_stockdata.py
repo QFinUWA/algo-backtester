@@ -61,9 +61,8 @@ class StockData:
         self._prices = np.array([{stock: self._data[i, 1 + s*5]
                                 for s, stock in enumerate(stocks)} for i in range(self._L)])
 
-        # self.sis = {s: dict() for s in stocks}
-        self.sinames = [(measurement, stock , i) for measurement, (i, stock) in 
-                        product(self._measurement, enumerate(self._stocks))]
+        self.sinames = [(measurement, stock , i) for i, (stock, measurement) in 
+                        enumerate(product(self._stocks, self._measurement))]
     
     #---------------[Properties]-----------------#
     @property
@@ -88,7 +87,7 @@ class StockData:
                 A[measurement][stock] = self._data[:index+1, i]
             siss.append(A)
 
-
+        print(siss[0])
         return self._prices, siss
     
     #---------------[Private Methods]-----------------#

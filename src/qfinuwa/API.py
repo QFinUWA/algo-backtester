@@ -6,6 +6,7 @@ from multiprocessing.pool import ThreadPool
 from multiprocessing import cpu_count
 import requests
 import zipfile
+from functools import reduce
 import io
 from typing import Union
 import time
@@ -50,14 +51,14 @@ class API:
     
 
     @classmethod
-    def fetch_stocks(cls, stocks: Union[str,  list], api_key_path: str, data_folder: str) -> None:
+    def fetch_stocks(cls, stocks: Union[str,  list], api_key_path: str, data_folder: str, download_raw: bool = False) -> None:
         '''
         Fetches the data from the SIP market-aggregated data. The data is provided by the SEC. An API key is required. The data is stored in the folder specified by `data_folder`.
 
         ### Parameters
         - ``stocks`` (``str``): The ticker(s) of the stock(s) to be downloaded. If multiple stocks are required, a list of tickers can be provided.
         - ``api_key_path`` (``str``): The path to the file containing the API key.
-
+        - ``download_raw`` (``bool``): If ``true``, downloads the data straight from the API provider, without alligning.
         ### Returns
         ``None``
         '''
@@ -74,7 +75,7 @@ class API:
         if isinstance(stocks, str):
             stocks = [stocks]
         
-        stocks.insert(0, 'SPY')
+        # stocks.insert(0, 'SPY')
 
         stock_df = []
 
@@ -97,6 +98,8 @@ class API:
                     with ThreadPool(n_threads) as p:
                         results = p.map(cls._process_request, urls)
                     # pbar.set_description(f'> Processing {stock}')
+                    if any(map(lambda df: len(df) ==0, results)):
+                        raise RuntimeError('Empty dataframe...')
                     df = pd.concat(results, axis=0, ignore_index=True)
                     df['time'] = pd.to_datetime(df['time'])
                     df = df.set_index('time')
@@ -109,12 +112,17 @@ class API:
                     stock_df.append((path, df))
                 
                 t_now = time.time()
-                time.sleep( max(0,30 - (t_now-t_last)))
+                time.sleep( max(0,10 - (t_now-t_last)))
                 pbar.set_description('Blocking...')
                 
                 pbar.update(1)
                 pbar.set_description(f'> Done Fetching') # hacky way to set last description but hey it works
-        cls._allign_data(stock_df)
+        
+        if download_raw:
+            for filepath, df in stock_df:
+                df.to_csv(filepath)
+        else:
+            cls._allign_data(stock_df)
 
     #---------------[Private Methods]-----------------# 
     @classmethod
@@ -198,19 +206,26 @@ class API:
         end_date = [df.index.max() for __, df in dfs]
         # crop dataframes
         start_date, end_date = max(start_date),  min(end_date)
+
         with tqdm(dfs) as pbar:
+
+            new_index = reduce(lambda a,b: a.union(b), (df.index for _, df in dfs))
+
+            new_index = new_index[(new_index >= start_date) & (new_index <= end_date)]
+            new_index = new_index[(new_index.hour + new_index.minute/60 >= 9.5)  & (new_index.hour < 16)]
+
             for filepath, df in dfs:          
                 pbar.set_description(f'> Alligning {filepath}')
 
                 # fill out with averages
-                filled_df = df.resample('T').mean().interpolate(method='time')
-                cropped_df = filled_df.loc[(filled_df.index >= start_date) & (filled_df.index <= end_date)]
+                # filled_df = df.resample('T').mean().interpolate(method='time')
+                # cropped_df = filled_df.loc[(filled_df.index >= start_date) & (filled_df.index <= end_date)]
 
                 # remove any times not in interval (4:00 - 20:00]
-                interval_df = cropped_df.loc[(cropped_df.index.hour >= 4) & (cropped_df.index.hour < 20)]
-                interval_df = interval_df.loc[(interval_df.index.dayofweek != 5) & (interval_df.index.dayofweek != 6)]
-
-                interval_df.to_csv(filepath)
+                # interval_df = cropped_df.loc[(cropped_df.index.hour >= 4) & (cropped_df.index.hour < 20)]
+                # interval_df = interval_df.loc[(interval_df.index.dayofweek != 5) & (interval_df.index.dayofweek != 6)]
+                new_df = df.reindex(new_index, axis=0).interpolate(method='linear')
+                new_df.to_csv(filepath)
 
                 # TODO - download new data
                 pbar.update(1)

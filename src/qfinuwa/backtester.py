@@ -8,9 +8,10 @@ from .strategy import Strategy
 from .indicators import Indicators
 from typing import Union
 from itertools import islice, tee
-from typing import Union
 import datetime
 from dateutil import parser
+import numpy as np
+
 # from IPython import get_ipython
 # try:
 #     shell = get_ipython().__class__.__name__
@@ -247,7 +248,7 @@ class Backtester:
     #---------------[Public Methods]-----------------#
        
     def run(self, strategy_params: dict = None, indicator_params: dict = None, 
-            cv: int = 1, seed: int = None, start_dates=None,
+            cv: int = 1, seed: int = None, start_dates: list = None,
             progressbar: bool=True) -> MultiRunResult:
         '''
         Runs the strategy on a set of hyperparameters.
@@ -257,12 +258,12 @@ class Backtester:
         - ``indicator_params`` (``dict``): The parameters of the indicators.
         - ``cv`` (``int``): The number of cross-validation folds to use.
         - ``seed`` (``int``): The seed to use for the random number generator.
+        - ``start_dates`` (``list``): List of start dates to test on.
         - ``progressbar`` (``bool``): Whether to show a progress bar.
 
         ## Returns
         result (``MultiRunResult``): The results of the strategy.
         '''
-
         if bool(strategy_params):
             if not isinstance(strategy_params, dict):
                 raise TypeError(f'strategy_params must be of type dict, not {type(strategy_params)}')
@@ -273,7 +274,6 @@ class Backtester:
             strategy_params = alg_defaults
         else:
             strategy_params = self.strategy.params
-
         if bool(indicator_params):
             if not isinstance(indicator_params, dict):
                 raise TypeError(f'indicator_params must be of type dict, not {type(indicator_params)}')
@@ -282,8 +282,7 @@ class Backtester:
             indicator_params = self._indicators.params
 
         self._random.seed(seed or random.randint(0, 2**32))
-
-        if not start_dates is None:
+        if start_dates is not None:
             if not isinstance(start_dates, list):
                 raise ValueError('start_dates must be a list')
             
@@ -315,15 +314,16 @@ class Backtester:
             #---------[RUN THE ALGORITHM]---------#
             for test_data in (tqdm(test, desc=desc, total = end-start, mininterval=0.5) if progressbar and cv == 1 else test):
                 strategy.run_on_data(test_data, portfolio)
-            cash, fees_paid, trades = portfolio.wrap_up()
+            value, trades = portfolio.wrap_up()
             on_finish = strategy.on_finish()
 
-            results.append(SingleRunResult(self.stocks, self._data, self._data.index, (start, end), cash, fees_paid, trades, on_finish ))
+            results.append(SingleRunResult(self.stocks, self._data, self._data.index, (start, end), value, trades, on_finish ))
             #-------------------------------------#
 
         return MultiRunResult((strategy_params, indicator_params), results)
     
-    def run_grid_search(self, strategy_params: dict = None, indicator_params: dict = None, cv: int = 1, seed: int =None) -> ParameterSweepResult:
+    def run_grid_search(self, strategy_params: dict = None, indicator_params: dict = None, 
+                        cv: int = 1, seed: int =None, start_dates: list = None) -> ParameterSweepResult:
         '''
         Runs a grid search over a set of hyperparameters.
 
@@ -332,6 +332,7 @@ class Backtester:
         - ``indicator_params`` (``dict``): The parameters of the indicators.
         - ``cv`` (``int``): The number of cross-validation folds to use.
         - ``seed`` (``int``): The seed to use for the random number generator.
+        - ``start_dates`` (``list``): List of start dates to test on.
 
         ## Returns
         result (``ParameterSweepResult``): The results of the strategy.
@@ -353,17 +354,29 @@ class Backtester:
         indicator_params = indicator_params or dict()
         indicator_params_list = self._indicators._get_permutations(indicator_params)
 
-
         print('> Backtesting the across the following ranges:')
         print('Agorithm Parameters', default_strategy_params)
         print('Indicator Parameters', self._indicators._fill_in_params(indicator_params))
 
         # run
         seed = seed or self._random.randint(0, 2**32)
-        res = []
+                
+        # print('get periods')
+        if start_dates is not None:
+            if not isinstance(start_dates, list):
+                raise ValueError('start_dates must be a list')
+            
+            cv = len(start_dates)
 
-        for alg_params, ind_params in tqdm(product(strategy_params_list, indicator_params_list), total=len(strategy_params_list) * len(indicator_params_list), desc=f"Running paramter sweep (cv={cv})"):
-            res.append(self.run(strategy_params=alg_params, indicator_params=ind_params, cv=cv, seed=seed, progressbar=False))
+            test_periods = self._get_periods(start_dates)
+        else:
+            # print(cv)
+            test_periods = self._get_random_periods(cv) 
+        total = len(strategy_params_list) * len(indicator_params_list)
+        res = [None for _ in range(total)]
+
+        for i, (alg_params, ind_params) in tqdm(enumerate(list(product(strategy_params_list, indicator_params_list))), total=total, desc=f"Running paramter sweep (cv={cv})"):
+            res[i] = self.run(strategy_params=alg_params, indicator_params=ind_params, cv=cv, seed=seed, progressbar=False, start_dates=test_periods)
         
         return ParameterSweepResult(res)
     
@@ -376,16 +389,18 @@ class Backtester:
         days = self._data.index.dt.to_period('D').drop_duplicates()
     
         s_is = self._random.sample(range(len(days) - self._days), n)
-
-
-        starts = (days.iloc[s_i].strftime("%d/%m/%Y") for s_i in s_is)
+        
+        starts = [days.iloc[s_i].strftime("%d/%m/%Y") for s_i in s_is]
 
         return self._get_periods(starts)
+    
         ends = (str(days.iloc[s_i+self._days]) for s_i in s_is)
 
         return [(self._data._index[self._data._index >= start].index[0], self._data._index[self._data._index < end].index[-1]) for start, end in zip(starts, ends)]
     
     def _get_periods(self, start_dates: list) -> list:
+        if all(map(lambda d: isinstance(d[0], np.int64) and isinstance(d[1], np.int64), start_dates)):
+            return start_dates
 
         d = datetime.timedelta(days = self._days)
         dt_starts = (parser.parse(s, dayfirst=True) for s in start_dates)
@@ -393,13 +408,11 @@ class Backtester:
 
         # dt_starts = start_dates
         periods = [(s, s+d) for s in dt_starts]
-
         index_start, index_end = self._data.date_range
         for s,e in periods:
-            if s < index_start or e > index_end:
+            if s + datetime.timedelta(days = 1) < index_start or e > index_end:
                 raise IndexError(f'Date range {s} -> {e} out of bounds: Please ensure start_date and (start_date + days) are in range.')
-
-        return ((self._data._index[self._data._index >= str(s)].index[0], self._data._index[self._data._index < str(e)].index[-1]) for s, e in periods)
+        return  [(self._data._index[self._data._index >= str(s)].index[0], self._data._index[self._data._index < str(e)].index[-1]) for s, e in periods]
 
 
     #---------------[Internal Methods]-----------------#
