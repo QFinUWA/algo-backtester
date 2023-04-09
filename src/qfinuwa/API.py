@@ -125,45 +125,45 @@ class API:
             cls._allign_data(stock_df)
 
     #---------------[Private Methods]-----------------# 
-    @classmethod
-    def _download_file_from_google_drive(cls, id: str, data_folder: str) -> None:
-        URL = "https://docs.google.com/uc?export=download"
-        # URL = 'https://drive.google.com/drive/folders/?usp=share_link'
+    # @classmethod
+    # def _download_file_from_google_drive(cls, id: str, data_folder: str) -> None:
+    #     URL = "https://docs.google.com/uc?export=download"
+    #     # URL = 'https://drive.google.com/drive/folders/?usp=share_link'
 
-        session = requests.Session()
+    #     session = requests.Session()
 
-        response = session.get(URL, params = { 'id' : id }, stream = True)
+    #     response = session.get(URL, params = { 'id' : id }, stream = True)
 
-        def get_confirm_token(response):
-            for key, value in response.cookies.items():
-                if key.startswith('download_warning'):
-                    return value
+    #     def get_confirm_token(response):
+    #         for key, value in response.cookies.items():
+    #             if key.startswith('download_warning'):
+    #                 return value
 
-            return None
+    #         return None
         
-        token = get_confirm_token(response)
+    #     token = get_confirm_token(response)
 
-        token = None
-        for key, value in response.cookies.items():
-            if key.startswith('download_warning'):
-                token = value
-                break
+    #     token = None
+    #     for key, value in response.cookies.items():
+    #         if key.startswith('download_warning'):
+    #             token = value
+    #             break
 
-        if token:
-            params = { 'id' : id, 'confirm' : token }
-            response = session.get(URL, params = params, stream = True)
+    #     if token:
+    #         params = { 'id' : id, 'confirm' : token }
+    #         response = session.get(URL, params = params, stream = True)
         
-        CHUNK_SIZE = 32768
-        try:
-            with io.BytesIO() as f:
-                for chunk in response.iter_content(CHUNK_SIZE):
-                    if chunk: # filter out keep-alive new chunks
-                        f.write(chunk)
-
-                with zipfile.ZipFile(f) as z:
-                    z.extractall(path=data_folder)
-        except:
-            print(f'Error downloading file {id} - skipping')
+    #     CHUNK_SIZE = 32768
+    #     try:
+    #         with io.BytesIO() as f:
+    #             for chunk in response.iter_content(CHUNK_SIZE):
+    #                 if chunk: # filter out keep-alive new chunks
+    #                     f.write(chunk)
+                
+    #             # with zipfile.ZipFile(f) as z:
+    #             #     z.extractall(path=data_folder)
+    #     except:
+    #         print(f'Error downloading file {id} - skipping')
 
 
     @classmethod

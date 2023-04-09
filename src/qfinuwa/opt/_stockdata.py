@@ -29,14 +29,14 @@ class StockData:
 
         self._verbose = verbose
 
-        self.spy = None
+        # self.spy = None
 
         self._stocks = []
 
         if data_folder is None: return
         
         if stocks is None:
-            stock = [f.split('.')[0] for f in os.listdir(data_folder) if f.endswith('.csv')]
+            stocks = [f.split('.')[0] for f in os.listdir(data_folder) if f.endswith('.csv')]
 
         # if len(stocks) == 0:
         #     raise ValueError('No stocks provided')
@@ -51,8 +51,8 @@ class StockData:
                 self._L = len(_df)
                 self._index = pd.to_datetime(_df['time'])
 
-            if stock == 'SPY':
-                self.spy = _df['close'].to_numpy()
+            # if stock == 'SPY':
+            #     self.spy = _df['close'].to_numpy()
 
             self._stock_df[stock] = _df[self._measurement]
         self._data = self._compress_data()
@@ -87,7 +87,6 @@ class StockData:
                 A[measurement][stock] = self._data[:index+1, i]
             siss.append(A)
 
-        print(siss[0])
         return self._prices, siss
     
     #---------------[Private Methods]-----------------#

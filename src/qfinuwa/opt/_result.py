@@ -82,7 +82,7 @@ class MultiRunResult:
         a,i = parameters
         self.parameters = {
             'strategy': a,
-            'indicator': i
+            'indicator': i,
         }
 
         self.results = results
@@ -122,26 +122,22 @@ class MultiRunResult:
 
 class ParameterSweepResult:
 
-    def __init__(self, multi_results: MultiRunResult):
+    def __init__(self, multi_results: MultiRunResult, params: dict):
 
-        a = dict()
-        i = dict()
-        for result in multi_results:
+        # a = dict()
+        # i = dict()
+        # for result in multi_results:
 
-            for para, val in result.parameters['strategy'].items():
-                a[para] = sorted(a.get(para, []) + [str(val)])
+        #     for para, val in result.parameters['strategy'].items():
+        #         a[para] = sorted(a.get(para, []) + [str(val)])
 
-            for indic, params in result.parameters['indicator'].items():
-                i[indic] = i.get(indic, dict())
+        #     for indic, params in result.parameters['indicator'].items():
+        #         i[indic] = i.get(indic, dict())
 
-                for para, val in params.items():
-                    i[indic][para] = sorted(i[indic].get(para, []) + [str(val)])
+        #         for para, val in params.items():
+        #             i[indic][para] = sorted(i[indic].get(para, []) + [str(val)])
 
-
-        self.parameters = {
-            'strategy_paramters': a,
-            'indicator_parameters': i
-        }
+        self.parameters = params
 
         self.results = sorted(multi_results, key=lambda res: -res.roi[0])
 

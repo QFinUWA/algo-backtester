@@ -34,6 +34,10 @@ class Portfolio:
     @property
     def delta(self):
         return self._delta
+    
+    @property
+    def delta_limits(self):
+        return self._delta_limits
         
     @property
     def curr_prices(self):

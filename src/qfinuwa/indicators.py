@@ -301,7 +301,7 @@ class Indicators:
 
         return every_combination
 
-    def _iterate_params(self, params=None):
+    def _iterate_params(self, params=None, copies=None):
 
         if params is None:
             params = self.params
@@ -311,8 +311,11 @@ class Indicators:
 
         # params maps function name to parameters
         self._indicators_iterations = {indicator: array(list(self._get_cached(funcn, params[funcn], indicator).values())) for funcn, indicators in self._funcn_to_indicator_map.items() for indicator in indicators}
-
-        return self.__iter__()
+        if copies is None:
+            self.__iter__()
+        # TODO: needlessly recreating iterator - could we just reset iterator related fields
+        #       and iterate again? maybe a modulo type situation?
+        return tuple(self.__iter__() for _ in range(copies))
     
     #---------[CACHE]---------#
     def _hashable(self, function_name, params):

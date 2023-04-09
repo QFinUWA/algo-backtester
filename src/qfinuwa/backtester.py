@@ -209,7 +209,7 @@ class Backtester:
         if isinstance(delta_limit, dict):
             if set(delta_limit.keys()) ^ set(self.stocks):
                 raise ValueError(f'delta_limit either contains unknown stocks or doesn\'t include all stocks')
-            if not all(map(lambda x: isinstance(int, x) and x > 0, delta_limit.values)):
+            if not all(map(lambda x: isinstance(x, int) and x > 0, delta_limit.values())):
                 raise ValueError(f'delta_limit includes either non int or negative value')
             self._delta_limits = delta_limit
         elif isinstance(delta_limit, int):
@@ -294,14 +294,15 @@ class Backtester:
         results = []
 
         # caclulate indicators 
-        data_og = zip(*self._precomp_prices, self._indicators._iterate_params(indicator_params))
-        data_tees = tee(data_og, cv)
-        test_iterator = zip(data_tees, test_periods)
+        data_tees = tee(self._precomp_prices[0], cv), \
+                    tee(self._precomp_prices[1], cv), \
+                    self._indicators._iterate_params(indicator_params, copies=cv)
+        test_iterator = zip(*data_tees, test_periods)
 
         days_format = f'{self._days} day{"s" if isinstance(self._days, str) or self._days > 1 else ""}'
 
         desc = f'> Running backtest over {cv} sample{"s" if cv > 1 else ""} of {days_format}'
-        for data, (start, end) in (tqdm(test_iterator, desc = desc, total = cv) if progressbar and cv > 1 else test_iterator):
+        for *data, (start, end) in (tqdm(test_iterator, desc = desc, total = cv) if progressbar and cv > 1 else test_iterator):
             
             portfolio = Portfolio(self.stocks, self._delta_limits, self._fee)
             if strategy_params:
@@ -309,7 +310,7 @@ class Backtester:
             else:
                 strategy = self._strategy(*tuple())
 
-            test = islice(data, start, end) 
+            test = islice(zip(*data), start, end) 
         
             #---------[RUN THE ALGORITHM]---------#
             for test_data in (tqdm(test, desc=desc, total = end-start, mininterval=0.5) if progressbar and cv == 1 else test):
@@ -378,7 +379,7 @@ class Backtester:
         for i, (alg_params, ind_params) in tqdm(enumerate(list(product(strategy_params_list, indicator_params_list))), total=total, desc=f"Running paramter sweep (cv={cv})"):
             res[i] = self.run(strategy_params=alg_params, indicator_params=ind_params, cv=cv, seed=seed, progressbar=False, start_dates=test_periods)
         
-        return ParameterSweepResult(res)
+        return ParameterSweepResult(res, (default_strategy_params, self._indicators._fill_in_params(indicator_params)))
     
     #---------------[Private Methods]-----------------#
     def _get_random_periods(self, n: int) -> list:
