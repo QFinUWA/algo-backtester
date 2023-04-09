@@ -21,16 +21,6 @@ download_folder = './data'
 API.fetch_stocks(['AAPL', 'GOOG', 'TSLA'], path_to_API, download_folder)
 ```
 
-To pull prepepared data from QFin's googledrive, call ``API.from_google_drive``:
-
-```py
-
-file_ids = 'file_ids.txt'
-download_folder = './data'
-
-API.from_google_drive(file_ids, download_folder)
-```
-
 ## Indicator Class
 
 #### Multi-Indicators
@@ -138,21 +128,29 @@ Similar to ``qfin.Indicators``, you can define hyperparameters for your model in
 # Example Strategy
 class BasicBollinger(Strategy):
 
-    def __init__(self, quantity=1):
+    def __init__(self, quantity=5):
         self.quantity = quantity
-        return
-
+        self.n_failed_orders = 0
+    
     def on_data(self, prices, indicators, portfolio):
-        
-        # If current price is below lower Bollinger Band, enter a long position
-        if(prices['close']['AAPL'][-1] < indicators['lower_bollinger']['AAPL'][-1]):
-            portfolio.cover_short('AAPL', quantity=self.quantity)
-            portfolio.enter_long('AAPL', quantity=self.quantity)
 
-        # If current price is above upper Bollinger Band, enter a long position   
-        if(prices['close']['AAPL'][-1] > indicators['upper_bollinger']['AAPL'][-1]):
-            portfolio.sell_long('AAPL', quantity=self.quantity)
-            portfolio.enter_short('AAPL', quantity=self.quantity)
+        # If current price is below lower Bollinger Band, enter a long position
+        for stock in portfolio.stocks:
+
+            if(prices['close'][stock][-1] < indicators['lower_bollinger'][stock][-1]):
+                order_success = portfolio.order(stock, quantity=self.quantity)
+                if not order_success:
+                    self.n_failed_orders += 1
+            
+            # If current price is above upper Bollinger Band, enter a short position
+            if(prices['close'][stock][-1] > indicators['upper_bollinger'][stock][-1]):
+                order_success = portfolio.order(stock, quantity=-self.quantity)
+                if not order_success:
+                    self.n_failed_orders += 1
+
+    def on_finish(self):
+        # Added to results object - access using result.on_finish
+        return self.n_failed_orders
 ```
 Additionally, you can specify a function ``on_finish`` that will run on the completion of a run, if you want to save your own data. Whatever this function returns will can be accessed in the results (see ``SingleRunResults.on_finish``).
 ## Backtester Class
@@ -169,7 +167,7 @@ from qfinuwa import Backtester
 
 backtester = Backtester(CustomStrategy, CustomIndicators, 
                         data=r'\data', days=90, 
-                        cash=1000, fee=0.01)
+                        delta_limits=1000, fee=0.01)
 ```
 
 ## Updating Indicator Parameters
