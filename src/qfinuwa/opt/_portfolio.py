@@ -20,6 +20,7 @@ class Portfolio:
         self._value = {stock: [] for stock in stocks}
         self._delta = {stock: 0 for stock in stocks}   
         self._fees_paid = {stock: 0 for stock in stocks}  
+        self._capital = {stock: 0 for stock in stocks}  
 
         self._trades = []
 
@@ -48,7 +49,7 @@ class Portfolio:
         self._curr_prices = prices
 
         for s in self._stocks:
-            self._value[s].append((self._delta[s]*self._curr_prices[s], self._fees_paid[s]))
+            self._value[s].append((self._delta[s]*self._curr_prices[s] + self._capital[s], self._fees_paid[s]))
 
     #---------------[Public Methods]-----------------#
 
