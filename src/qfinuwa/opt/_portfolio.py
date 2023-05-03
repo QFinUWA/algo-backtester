@@ -60,7 +60,7 @@ class Portfolio:
 
         self._delta[stock] += quantity
         price = quantity*self._curr_prices[stock]
-        self._capital[stock] -= price
+        self._capital[stock] += price
         self._fees_paid[stock] += abs(self._fee*price)
         self._trades.append((self._i, stock, quantity))
         return True
