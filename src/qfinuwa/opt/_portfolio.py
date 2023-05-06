@@ -57,6 +57,9 @@ class Portfolio:
         
         if abs(self._delta[stock] + quantity) > self._delta_limits[stock]:
             return False 
+        
+        if quantity == 0:
+            return False
 
         self._delta[stock] += quantity
         price = quantity*self._curr_prices[stock]
