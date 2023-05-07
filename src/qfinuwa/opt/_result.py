@@ -17,9 +17,9 @@ class SingleRunResult:
 
         self.n_buys = {stock: len([q for i,s,q in self.buys if s == stock]) for stock in stocks}
         self.n_sells = {stock: len([-q for i,s,q in self.sells if s == stock]) for stock in stocks}
-        self.gross_pnl = {stock: value[stock][-1][0] for stock in stocks}
-        self.fees_paid = {stock: value[stock][-1][1] for stock in stocks}
-        self.net_pnl = {stock: value[stock][-1][0] - value[stock][-1][1]  for stock in stocks}
+        self.gross_pnl = {stock: value[stock][-1][1] for stock in stocks}
+        self.fees_paid = {stock: value[stock][-1][2] for stock in stocks}
+        self.net_pnl = {stock: value[stock][-1][1] - value[stock][-1][2]  for stock in stocks}
 
         self.value = value
         self._datetimeindex = datetimeindex.reset_index(drop=True)

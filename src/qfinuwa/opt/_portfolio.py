@@ -49,7 +49,7 @@ class Portfolio:
         self._curr_prices = prices
 
         for s in self._stocks:
-            self._value[s].append((self._delta[s]*self._curr_prices[s] + self._capital[s], self._fees_paid[s]))
+            self._value[s].append((self._delta[s]*self._curr_prices[s], self._capital[s], self._fees_paid[s]))
 
     #---------------[Public Methods]-----------------#
 
@@ -72,6 +72,7 @@ class Portfolio:
     def wrap_up(self):
         for stock in self._stocks:
             self.order(stock, -self._delta[stock])
+        self.curr_prices = self.curr_prices
         return (self._value,  self._trades)
     
 
