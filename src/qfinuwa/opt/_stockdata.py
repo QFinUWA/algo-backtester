@@ -56,10 +56,9 @@ class StockData:
 
             self._stock_df[stock] = _df[self._measurement]
         self._data = self._compress_data()
-
         # pre calcualte the price at every iteration for efficiency
         self._prices = np.array([{stock: self._data[i, 1 + s*5]
-                                for s, stock in enumerate(stocks)} for i in range(self._L)])
+                                for s, stock in enumerate(self._stocks)} for i in range(self._L)])
 
         self.sinames = [(measurement, stock , i) for i, (stock, measurement) in 
                         enumerate(product(self._stocks, self._measurement))]
