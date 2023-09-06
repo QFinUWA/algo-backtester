@@ -10,6 +10,8 @@ from functools import reduce
 import io
 from typing import Union
 import time
+from datetime import datetime
+
 # from IPython import get_ipython
 # try:
 #     shell = get_ipython().__class__.__name__
@@ -51,7 +53,7 @@ class API:
     
 
     @classmethod
-    def fetch_stocks(cls, stocks: Union[str,  list], api_key_path: str, data_folder: str, download_raw: bool = False) -> None:
+    def fetch_stocks(cls, stocks: Union[str,  list], api_key_path: str, data_folder: str, download_raw: bool = False, months: int = 60) -> None:
         '''
         Fetches the data from the SIP market-aggregated data. The data is provided by the SEC. An API key is required. The data is stored in the folder specified by `data_folder`.
 
@@ -79,49 +81,65 @@ class API:
 
         stock_df = []
 
-        years = [2,1]
-        months = range(12,0,-1)
+        today = pd.to_datetime('today').strftime("%d/%m/%Y")
+        last = (pd.to_datetime(today) - pd.DateOffset(months=months+1))
+        month_periods = pd.date_range(start=last, end=today, freq='M').strftime("%Y-%m")
+        month_periods = [k.split('-') for k in month_periods[:-1]]
+        
         
         with tqdm(stocks) as pbar:
             for stock in stocks:
 
                 urls = [cls._get_params(stock, year, month, apikey)
-                        for year, month in product(years, months)][:-3]
+                        for year, month in month_periods]
 
                 n_threads = min(cpu_count(), len(urls))
 
                 pbar.set_description(f'> Fetching {stock} ({n_threads} threads)')
 
                 path = os.path.join(data_folder, f"{stock}.csv")
+                t_last = time.time()
                 if not os.path.exists(path):
-                    t_last = time.time()
                     with ThreadPool(n_threads) as p:
                         results = p.map(cls._process_request, urls)
                     # pbar.set_description(f'> Processing {stock}')
                     if any(map(lambda df: len(df) ==0, results)):
-                        raise RuntimeError('Empty dataframe...')
+                        # raise RuntimeError('Empty dataframe...')
+                        print('Empty dataframe... skipping')
+                        continue
+                    # print(results[0].head(5))
                     df = pd.concat(results, axis=0, ignore_index=True)
-                    df['time'] = pd.to_datetime(df['time'])
+                    # df.to_csv(stock + '_raw.csv', index=True)
+                    try:
+                        print(df.columns)
+                        df.rename(columns={'timestamp': 'time'}, inplace=True)
+                        df['time'] = pd.to_datetime(df['time'])
+                    except:
+                        print(f'{stock} - Error parsing timestamp')
+                        df.to_csv(f'data/error_{stock}.csv')
+                        continue
                     df = df.set_index('time')
                     df.sort_values(
                         by='time', inplace=True)
                     
+                    # print(df.head())
+                    
                     pbar.set_description(f'> Saving {stock} ({len(df)} rows)')
-                    # df.to_csv(cls.to_path(stock + '_raw'), index=False)
+                    # df.to_csv('raw/' + stock + '_raw.csv', index=True)
                     path = os.path.join(data_folder, f"{stock}.csv")
                     stock_df.append((path, df))
+                    if download_raw:
+                        df.to_csv(path)
                 
                 t_now = time.time()
-                time.sleep( max(0,10 - (t_now-t_last)))
+                # time.sleep( max(0, 60 - (t_now-t_last)))
                 pbar.set_description('Blocking...')
                 
                 pbar.update(1)
                 pbar.set_description(f'> Done Fetching') # hacky way to set last description but hey it works
         
-        if download_raw:
-            for filepath, df in stock_df:
-                df.to_csv(filepath)
-        else:
+
+        if not download_raw:
             cls._allign_data(stock_df)
 
     #---------------[Private Methods]-----------------# 
@@ -170,12 +188,13 @@ class API:
     def _get_params(cls, stock: str, year: int, month: int, api_key: str) -> str:
 
         params = {
-            'function': 'TIME_SERIES_INTRADAY_EXTENDED',
+            'function': 'TIME_SERIES_INTRADAY',
             'symbol': stock,
             'interval': '1min',
             'datatype': 'csv',
             'adjusted': 'true',
-            "slice": f'year{year}month{month}',
+            'month': f'{year}-{month}',
+            'outputsize': 'full',
             'apikey': api_key,
         }
         # print(
@@ -188,7 +207,7 @@ class API:
         # print(f'processed {url}')
         df = pd.read_csv(url_request)
 
-        assert len(df) > 0, f'{df}'
+        # assert len(df) > 0, f'{df}'
         # if not df:
         #     return (stock, None)
         # df = df.drop(columns=['open', 'high', 'low'])
@@ -224,7 +243,14 @@ class API:
                 # remove any times not in interval (4:00 - 20:00]
                 # interval_df = cropped_df.loc[(cropped_df.index.hour >= 4) & (cropped_df.index.hour < 20)]
                 # interval_df = interval_df.loc[(interval_df.index.dayofweek != 5) & (interval_df.index.dayofweek != 6)]
+                # print(df.columns)
+                # print(new_index)
                 new_df = df.reindex(new_index, axis=0).interpolate(method='linear')
+                # convert to 3dps
+                new_df = new_df.round(3)
+                # round volume
+                new_df['volume'] = new_df['volume'].round(0)
+
                 new_df.to_csv(filepath)
 
                 # TODO - download new data

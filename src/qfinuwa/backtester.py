@@ -73,7 +73,7 @@ class Backtester:
             stocks: list, 
             data_folder: str, days: Union[int , str] = 'all', 
             delta_limits:  Union[int , dict]=10000, fee: float=0.0,
-            progressbar=True):
+            progressbar=True, low_memory=False):
         '''
         # Backteser
         A class for running a strategy on historical data. Once initialised, the data is precompiled
@@ -118,7 +118,7 @@ class Backtester:
         self._strategy_wrapper = _StrategyModifier(strategy_class)
         # self._strategy = strategy_class
 
-        self._data = StockData(data_folder, stocks=stocks, verbose=progressbar)
+        self._data = StockData(data_folder, stocks=stocks, verbose=progressbar, low_memory=low_memory)
         self._precomp_prices = self._data.prices
 
         # raise expection if indiators is not a subclass of Indicators
@@ -280,6 +280,10 @@ class Backtester:
             self._indicators._add_parameters(indicator_params)
         else:
             indicator_params = self._indicators.params
+
+        if self._data.low_memory:
+            self._precomp_prices = self._data.prices
+            
 
         self._random.seed(seed or random.randint(0, 2**32))
         if start_dates is not None:

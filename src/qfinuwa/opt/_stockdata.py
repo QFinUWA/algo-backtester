@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import os
 from itertools import product
+from collections import defaultdict
 
 # from IPython import get_ipython
 
@@ -15,9 +16,11 @@ from itertools import product
 #     from tqdm import tqdm      # Probably standard Python interpreter
 from tqdm import tqdm
 
+
+
 class StockData:
 
-    def __init__(self, data_folder: str = None, stocks: list = None, verbose: bool=False):
+    def __init__(self, data_folder: str = None, stocks: list = None, verbose: bool=False, low_memory: bool = False):
 
         self._measurement = ['open', 'close', 'high', 'low', 'volume']
         self._i = 0
@@ -32,6 +35,8 @@ class StockData:
         # self.spy = None
 
         self._stocks = []
+
+        self.low_memory = low_memory
 
         if data_folder is None: return
         
@@ -53,7 +58,7 @@ class StockData:
 
             # if stock == 'SPY':
             #     self.spy = _df['close'].to_numpy()
-
+            _df.set_index(self._index, inplace=True)
             self._stock_df[stock] = _df[self._measurement]
         self._data = self._compress_data()
         # pre calcualte the price at every iteration for efficiency
@@ -78,13 +83,25 @@ class StockData:
 
     @property
     def prices(self):
+
+        def price_indexer():
+
+            for index in range(len(self)):
+                A = defaultdict(dict) 
+                for measurement, stock, i in self.sinames:
+                    A[measurement][stock] = self._data[:index+1, i]
+                yield A
+
+        if self.low_memory:
+            return self._prices, price_indexer() 
+                
         siss = []
-        for index in (tqdm(range(len(self)),  desc = '> Precompiling data', mininterval=0.5) if self._verbose else range(len(self))):
-            A = {measurement: dict() for measurement in self._measurement}
-            
-            for measurement, stock, i in self.sinames:
-                A[measurement][stock] = self._data[:index+1, i]
-            siss.append(A)
+        for price_point in (tqdm(price_indexer(),  
+                desc = '> Precompiling data', 
+                mininterval=0.5,
+                total=len(self)) if self._verbose else range(len(self))):
+
+            siss.append(price_point)
 
         return self._prices, siss
     
