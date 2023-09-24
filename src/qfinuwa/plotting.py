@@ -56,8 +56,8 @@ class Plotting:
             
             for stock, prices in stock_prices.items():
                 # print(stock, prices[0])
-                p.circle(lbuy[stock], np.array([prices.iloc[i] for i in lbuy[stock]]), color='red', size=SIZE, legend_label='buy')
-                p.circle(lsell[stock], np.array([prices.iloc[i] for i in lsell[stock]]), color='green', size=SIZE, legend_label='sell')
+                p.circle(lbuy[stock], np.array([prices.iloc[i] for i in lbuy[stock]]), color='green', size=SIZE, legend_label='buy')
+                p.circle(lsell[stock], np.array([prices.iloc[i] for i in lsell[stock]]), color='red', size=SIZE, legend_label='sell')
 
         bokeh.plotting.show(p)
         if filename:
