@@ -40,8 +40,9 @@ class SingleRunResult:
         return self._datetimeindex.iloc[0].strftime("%d/%m/%Y"), self._datetimeindex.iloc[-1].strftime("%d/%m/%Y")
 
     @property
-    def vaue_over_time(self):
+    def value_over_time(self):
         return [sum(self.value[s][i][0] - self.value[s][i][1]for s in self._stocks) for i in range(len(list(self.value.values())[0]))]
+
     @property
     def statistics(self):
 
