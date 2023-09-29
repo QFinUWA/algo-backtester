@@ -70,7 +70,7 @@ class SingleRunResult:
     
     def sharp_ratio(self, risk_free_rate = 0):
         
-        p_returns = self.value_over_time.pct_change()
+        p_returns = DataFrame(self.value_over_time.pct_change())
 
         return (p_returns.mean() - risk_free_rate) / p_returns.std()
     
