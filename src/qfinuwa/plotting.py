@@ -37,7 +37,7 @@ class Plotting:
         }
         
         # -----[plotting portfolio]-----
-        value = [sum(result.value[s][i][0] - result.value[s][i][1]for s in stocks) for i in range(len(list(result.value.values())[0]))]
+        value = result.value_over_time
         r = np.array([_ for _ in range(len(value))])
         if show_portfolio:
             p.line(r, value, line_width=2, legend_label='portfolio', color='black')

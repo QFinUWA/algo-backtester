@@ -40,6 +40,9 @@ class SingleRunResult:
         return self._datetimeindex.iloc[0].strftime("%d/%m/%Y"), self._datetimeindex.iloc[-1].strftime("%d/%m/%Y")
 
     @property
+    def vaue_over_time(self):
+        return [sum(self.value[s][i][0] - self.value[s][i][1]for s in self._stocks) for i in range(len(list(self.value.values())[0]))]
+    @property
     def statistics(self):
 
         df = DataFrame({stock: [
@@ -63,6 +66,12 @@ class SingleRunResult:
                         ]
 
         return df
+    
+    def sharp_ratio(self, risk_free_rate = 0):
+        
+        p_returns = self.value_over_time.pct_change()
+
+        return (p_returns.mean() - risk_free_rate) / p_returns.std()
     
     def save(self, filename: str):
         with open(filename, 'w') as f:
@@ -98,6 +107,9 @@ class MultiRunResult:
         with open(filename, 'w') as f:
             f.write(str(self) )
 
+    def sharp_ratio(self, risk_free_rate = 0):
+        return np.mean([result.sharp_ratio(risk_free_rate) for result in self.results])
+        
     #---------------[Properties]-----------------#
     @property
     def roi(self):
