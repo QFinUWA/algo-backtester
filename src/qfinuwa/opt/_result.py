@@ -29,7 +29,9 @@ class SingleRunResult:
 
         self.on_finish = on_finish
 
-        self._percentage_returns = DataFrame(self.value_over_time.pct_change())
+        self.value_over_time = DataFrame([sum(self.value[s][i][0] - self.value[s][i][1]for s in self._stocks) 
+                                    for i in range(len(list(self.value.values())[0]))] )
+
 
     #---------------[Properties]-----------------#
     @property
@@ -40,10 +42,6 @@ class SingleRunResult:
     def date_range(self):
         # reset index of self.datetimeindex
         return self._datetimeindex.iloc[0].strftime("%d/%m/%Y"), self._datetimeindex.iloc[-1].strftime("%d/%m/%Y")
-
-    @property
-    def value_over_time(self):
-        return [sum(self.value[s][i][0] - self.value[s][i][1]for s in self._stocks) for i in range(len(list(self.value.values())[0]))]
 
     @property
     def statistics(self):
@@ -58,20 +56,26 @@ class SingleRunResult:
                 0 if self.n_buys[stock] + self.n_sells[stock] == 0 else self.net_pnl[stock]/(self.n_buys[stock] + self.n_sells[stock]),
                     ] for stock in self._stocks}, 
                     index = ['n_trades', 'n_buys', 'n_sells', 'gross_pnl', 'fees_paid', 'net_pnl', 'pnl_per_trade'])
-        
+
+        n_trades = sum(self.n_buys.values()) + sum(self.n_sells.values()) 
+        pnl_per_trade = 0
+        if n_trades > 0:
+            pnl_per_trade = sum(self.net_pnl.values())/n_trades
+
         df['Net'] = [ df.iloc[0, :].sum(),
                         df.iloc[1, :].sum(),
                         df.iloc[2, :].sum(),
                         df.iloc[3, :].sum(),
                         df.iloc[4, :].sum(),
                         df.iloc[5, :].sum(),
-                        sum(self.net_pnl.values())/(sum(self.n_buys.values()) + sum(self.n_sells.values())),
+                        pnl_per_trade,
                         ]
 
         return df
     
     def sharp_ratio(self, risk_free_rate = 0):
-        return (self._percentage_returns.mean() - risk_free_rate) / self._percentage_return.std()
+        percentage_returns = self.value_over_time.pct_change(1).pct_change(1).replace([np.inf, -np.inf], np.nan).dropna()
+        return ((percentage_returns.mean(axis=0)[0] - risk_free_rate) / percentage_returns.std(axis=0)[0])
     
     def save(self, filename: str):
         with open(filename, 'w') as f:
@@ -81,7 +85,7 @@ class SingleRunResult:
         table =  str(tabulate(self.statistics, headers = 'keys', tablefmt="github", showindex = True, numalign="right"))
         return '\n' + ' -> '.join(self.date_range) + \
             f'\n\nROI:\t{self.roi}\n' +  \
-            f'\n\nSharp Ratio (0% risk free):\t{self.sharp_ratio}\n\n' + \
+            f'\nSharp Ratio (0% risk free):\t{self.sharp_ratio()}\n\n' + \
             'RUN RESULTS:\n' + table
 
     def __repr__(self) -> str:
@@ -131,7 +135,7 @@ class MultiRunResult:
         table = str(tabulate(self.statistics, headers = 'keys', tablefmt="github", showindex = True, numalign="right"))
         return '\n' + str(self.parameters) + \
             f'\n\nMean ROI:\t{self.roi[0]}\nSTD ROI:\t{self.roi[1]}\n\n' + \
-            f'\n\nMean SHARP RATIO:\t{self.sharp_ratio[0]}\nSTD SHARP RATIO:\t{self.sharp_ratio[1]}\n\n' + \
+            f'\nMean SHARP RATIO:\t{self.sharp_ratio(0)[0]}\nSTD SHARP RATIO:\t{self.sharp_ratio()[1]}\n\n' + \
               '\n'.join([(' -> '.join(res.date_range) + f':\t{res.roi:.3f}') for res in self]) \
                 +'\n\n'  + f'AVERAGED RESULTS FOR {len(self.results)} RUNS:\n' + table
 
