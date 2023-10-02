@@ -29,6 +29,8 @@ class SingleRunResult:
 
         self.on_finish = on_finish
 
+        self._percentage_returns = DataFrame(self.value_over_time.pct_change())
+
     #---------------[Properties]-----------------#
     @property
     def roi(self):
@@ -69,10 +71,7 @@ class SingleRunResult:
         return df
     
     def sharp_ratio(self, risk_free_rate = 0):
-        
-        p_returns = DataFrame(self.value_over_time.pct_change())
-
-        return (p_returns.mean() - risk_free_rate) / p_returns.std()
+        return (self._percentage_returns.mean() - risk_free_rate) / self._percentage_return.std()
     
     def save(self, filename: str):
         with open(filename, 'w') as f:
@@ -80,7 +79,10 @@ class SingleRunResult:
 
     def __str__(self):
         table =  str(tabulate(self.statistics, headers = 'keys', tablefmt="github", showindex = True, numalign="right"))
-        return '\n' + ' -> '.join(self.date_range) + f'\n\nROI:\t{self.roi}\n\n' +  'RUN RESULTS:\n' + table
+        return '\n' + ' -> '.join(self.date_range) + \
+            f'\n\nROI:\t{self.roi}\n' +  \
+            f'\n\nSharp Ratio (0% risk free):\t{self.sharp_ratio}\n\n' + \
+            'RUN RESULTS:\n' + table
 
     def __repr__(self) -> str:
         return self.__str__()
@@ -109,7 +111,8 @@ class MultiRunResult:
             f.write(str(self) )
 
     def sharp_ratio(self, risk_free_rate = 0):
-        return np.mean([result.sharp_ratio(risk_free_rate) for result in self.results])
+        sharp_ratios = [result.sharp_ratio(risk_free_rate) for result in self.results]
+        return (np.mean(sharp_ratios), np.std(sharp_ratios))
         
     #---------------[Properties]-----------------#
     @property
@@ -126,7 +129,9 @@ class MultiRunResult:
 
     def __str__(self):
         table = str(tabulate(self.statistics, headers = 'keys', tablefmt="github", showindex = True, numalign="right"))
-        return '\n' + str(self.parameters) + f'\n\nMean ROI:\t{self.roi[0]}\nSTD ROI:\t{self.roi[1]}\n\n' + \
+        return '\n' + str(self.parameters) + \
+            f'\n\nMean ROI:\t{self.roi[0]}\nSTD ROI:\t{self.roi[1]}\n\n' + \
+            f'\n\nMean SHARP RATIO:\t{self.sharp_ratio[0]}\nSTD SHARP RATIO:\t{self.sharp_ratio[1]}\n\n' + \
               '\n'.join([(' -> '.join(res.date_range) + f':\t{res.roi:.3f}') for res in self]) \
                 +'\n\n'  + f'AVERAGED RESULTS FOR {len(self.results)} RUNS:\n' + table
 
