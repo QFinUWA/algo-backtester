@@ -74,7 +74,7 @@ class SingleRunResult:
         return df
     
     def sharp_ratio(self, risk_free_rate = 0):
-        percentage_returns = self.value_over_time.pct_change(1).pct_change(1).replace([np.inf, -np.inf], np.nan).dropna()
+        percentage_returns = self.value_over_time.ffill().pct_change(1).replace([np.inf, -np.inf], np.nan).dropna()
         ret = ((percentage_returns.mean(axis=0)[0] - risk_free_rate) / percentage_returns.std(axis=0)[0])
         # check NaN
         if np.isnan(ret):
