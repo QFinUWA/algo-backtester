@@ -7,8 +7,9 @@ class SingleRunResult:
 
     def __init__(self, stocks: list, stockdata, 
             datetimeindex: DatetimeIndex, startend: tuple, 
-            value: dict, trades: list, on_finish: object):
+            value: dict, trades: list, fee: float, on_finish: object):
         self._start, self._end = startend
+        self.fee = fee
 
         datetimeindex = datetimeindex[self._start: self._end]
 
@@ -29,7 +30,9 @@ class SingleRunResult:
 
         self.on_finish = on_finish
 
-        self.value_over_time = DataFrame([sum(self.value[s][i][0] + self.value[s][i][1]for s in self._stocks) 
+        self.value_over_time = DataFrame([
+                                    sum(self.value[s][i][0] - abs(self.fee*self.value[s][i][0]) + self.value[s][i][1] - self.value[s][i][2] \
+                                    for s in self._stocks) 
                                     for i in range(len(list(self.value.values())[0]))], columns=["value"])
 
 

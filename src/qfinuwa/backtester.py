@@ -322,7 +322,7 @@ class Backtester:
             value, trades = portfolio.wrap_up()
             on_finish = strategy.on_finish()
 
-            results.append(SingleRunResult(self.stocks, self._data, self._data.index, (start, end), value, trades, on_finish ))
+            results.append(SingleRunResult(self.stocks, self._data, self._data.index, (start, end), value, trades, self.fee, on_finish ))
             #-------------------------------------#
 
         return MultiRunResult((strategy_params, indicator_params), results)
