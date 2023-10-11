@@ -105,7 +105,7 @@ class Plotting:
 
         p.multi_line(xs='xs', ys='ys', legend_label='names', cols='cols', line_width=2, source=source)
 
-        bokeh.plotting.show(p)
+        bokeh.plotting.show(p, notebook_handle=True)
         if filename:
             bokeh.plotting.output_file(filename)
     
