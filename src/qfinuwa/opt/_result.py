@@ -30,7 +30,7 @@ class SingleRunResult:
         self.on_finish = on_finish
 
         self.value_over_time = DataFrame([sum(self.value[s][i][0] - self.value[s][i][1]for s in self._stocks) 
-                                    for i in range(len(list(self.value.values())[0]))] )
+                                    for i in range(len(list(self.value.values())[0]))], columns=["value"])
 
 
     #---------------[Properties]-----------------#
